@@ -1,0 +1,1192 @@
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { useQuery, useMutation } from 'react-query';
+import { useCartStore, useAuthStore } from '../store';
+import { productsApi, categoriesApi, shopApi, reviewsApi, ordersApi } from '../services/api';
+import {
+  ShoppingCart, Star, Phone, Mail, MapPin, Clock,
+  X, Minus, Plus, ChevronUp, ArrowRight, LogIn
+} from 'lucide-react';
+import { clsx } from 'clsx';
+import toast from 'react-hot-toast';
+import { Link, useNavigate } from 'react-router-dom';
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Scroll-reveal hook using IntersectionObserver (no GSAP — no opacity bug)
+// Elements start invisible via CSS class, become visible once they enter
+// the viewport. The `seen` flag ensures the animation only plays once.
+// ═══════════════════════════════════════════════════════════════════════════════
+function useInView(options = {}) {
+  const ref  = useRef(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        obs.disconnect(); // only trigger once
+      }
+    }, { threshold: 0.1, rootMargin: '0px 0px -60px 0px', ...options });
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, visible];
+}
+
+// CSS helper — items are invisible until the IntersectionObserver fires
+const reveal = (visible, delay = 0) => ({
+  opacity:    visible ? 1 : 0,
+  transform:  visible ? 'translateY(0)' : 'translateY(22px)',
+  transition: `opacity 0.5s ease ${delay}ms, transform 0.5s ease ${delay}ms`,
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// LOADER
+// ═══════════════════════════════════════════════════════════════════════════════
+function SiteLoader({ onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 1800);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  return (
+    <div className="fixed inset-0 bg-[#f5eeea] z-[9999] flex flex-col items-center justify-center">
+      <div className="flex gap-3 mb-5">
+        {['🐟','🍗','🥩'].map((e, i) => (
+          <span
+            key={i}
+            className="text-5xl sm:text-6xl"
+            style={{ animation: `loaderBounce 0.75s ease ${i * 0.22}s infinite alternate` }}
+          >
+            {e}
+          </span>
+        ))}
+      </div>
+      <h1 className="font-display text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
+        Smart Meat Shop
+      </h1>
+      <p className="text-sm text-stone-400 mb-6">Fresh Fish · Chicken · Mutton · Daily</p>
+      <div className="w-40 h-1 bg-stone-200 rounded-full overflow-hidden">
+        <div style={{ animation: 'loaderBar 1.6s ease forwards' }}
+          className="h-full bg-brand-500 rounded-full" />
+      </div>
+      <style>{`
+        @keyframes loaderBounce {
+          from { transform: translateY(0)   scale(1);    }
+          to   { transform: translateY(-14px) scale(1.12); }
+        }
+        @keyframes loaderBar {
+          from { width: 0%;   }
+          to   { width: 100%; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// NAVBAR
+// ═══════════════════════════════════════════════════════════════════════════════
+function Navbar({ cartCount, onOpenCart }) {
+  const [scrolled, setScrolled] = useState(false);
+  const { user, token } = useAuthStore();
+
+  useEffect(() => {
+    const fn = () => setScrolled(window.scrollY > 50);
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+
+  return (
+    <nav className={clsx(
+      'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+      scrolled ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-stone-200' : 'bg-transparent'
+    )}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center text-lg">🥩</div>
+          <div>
+            <p className={clsx('font-display text-base font-bold leading-none transition', scrolled ? 'text-stone-900' : 'text-white')}>
+              Smart Meat Shop
+            </p>
+            <p className={clsx('text-[10px] transition', scrolled ? 'text-stone-400' : 'text-white/70')}>
+              Fresh · Quality · Daily
+            </p>
+          </div>
+        </div>
+
+        {/* Links */}
+        <div className="hidden md:flex items-center gap-1">
+          {[['shop','🛒 Shop'],['reviews','Reviews'],['contact','Contact']].map(([id, label]) => (
+            <button key={id} onClick={() => scrollTo(id)}
+              className={clsx('px-3 py-1.5 rounded-lg text-sm font-medium transition',
+                scrolled ? 'text-stone-600 hover:bg-stone-100' : 'text-white/90 hover:bg-white/10')}>
+              {label}
+            </button>
+          ))}
+        </div>
+
+        {/* Right */}
+        <div className="flex items-center gap-2">
+          <button onClick={onOpenCart}
+            className="relative flex items-center gap-1.5 bg-brand-500 hover:bg-brand-600 text-white px-3 py-2 rounded-xl text-sm font-semibold transition shadow-brand">
+            <ShoppingCart size={15} />
+            <span className="hidden sm:block">Cart</span>
+            {cartCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-white text-brand-600 text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-brand-500">
+                {cartCount}
+              </span>
+            )}
+          </button>
+
+          {token ? (
+            <Link
+              to={user?.role === 'ADMIN' ? '/admin' : user?.role === 'SELLER' ? '/seller' : '/'}
+              className={clsx('px-3 py-2 rounded-xl text-sm font-medium transition border',
+                scrolled ? 'border-stone-200 text-stone-700 hover:bg-stone-50' : 'border-white/30 text-white hover:bg-white/10')}>
+              {user?.role === 'ADMIN' || user?.role === 'SELLER' ? 'Dashboard' : 'My Orders'}
+            </Link>
+          ) : (
+            <Link to="/login"
+              className={clsx('px-3 py-2 rounded-xl text-sm font-medium transition border flex items-center gap-1',
+                scrolled ? 'border-stone-200 text-stone-700 hover:bg-stone-50' : 'border-white/30 text-white hover:bg-white/10')}>
+              <LogIn size={14} /> Login
+            </Link>
+          )}
+        </div>
+      </div>
+    </nav>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HERO
+// ═══════════════════════════════════════════════════════════════════════════════
+function Hero({ settings, products }) {
+  return (
+    <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-stone-900">
+      {/* Background */}
+      <div className="absolute inset-0">
+        <img
+          src={settings?.bannerUrl || 'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=1600&q=80'}
+          alt="hero"
+          className="w-full h-full object-cover opacity-40"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-stone-900/90 via-stone-900/60 to-stone-900/20" />
+      </div>
+
+      <div className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 pt-20 pb-12 grid grid-cols-1 lg:grid-cols-2 gap-10 items-center">
+        {/* Text — CSS stagger animation on mount */}
+        <div>
+          <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 mb-5"
+            style={{ animation: 'heroFade 0.7s ease 0.2s both' }}>
+            <span className="w-2 h-2 bg-green-400 rounded-full" style={{ animation: 'blink 2s infinite' }} />
+            <span className="text-white/90 text-xs font-medium">
+              {settings?.status || 'SHOP OPEN '} · {settings?.openTime || '8AM'} – {settings?.closeTime || '8PM'}
+            </span>
+          </div>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold text-white leading-tight mb-4"
+            style={{ animation: 'heroFade 0.7s ease 0.35s both' }}>
+            The Freshest<br />
+            <span className="text-brand-300">Fish, Chicken</span><br />
+            &amp; Mutton in Town
+          </h1>
+          <p className="text-white/70 text-base mb-7 max-w-md leading-relaxed"
+            style={{ animation: 'heroFade 0.7s ease 0.5s both' }}>
+            Sourced fresh every morning. Order online, pay, and collect from our dedicated
+            Dispatch Counter — skip the queue.
+          </p>
+          <div className="flex flex-wrap gap-3" style={{ animation: 'heroFade 0.7s ease 0.65s both' }}>
+            <button
+              onClick={() => document.getElementById('shop')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-brand-500 hover:bg-brand-400 text-white px-6 py-3 rounded-xl text-sm font-bold shadow-brand transition flex items-center gap-2">
+              🛒 Order Now <ArrowRight size={15} />
+            </button>
+            <button
+              onClick={() => document.getElementById('contact')?.scrollIntoView({ behavior: 'smooth' })}
+              className="bg-white/10 hover:bg-white/20 text-white border border-white/25 px-6 py-3 rounded-xl text-sm font-medium transition backdrop-blur-sm">
+              Find Us ↓
+            </button>
+          </div>
+        </div>
+
+        {/* Live price cards */}
+        <div className="hidden lg:flex flex-col gap-3 max-w-sm">
+          <p className="text-white/50 text-xs font-semibold uppercase tracking-wider mb-1">Today's Prices</p>
+          {(products || []).slice(0, 5).map((p, i) => (
+            <div key={p.id}
+              style={{ animation: `heroFade 0.6s ease ${0.7 + i * 0.1}s both` }}
+              className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-4 py-3 flex items-center gap-3">
+              <span className="text-xl">{p.categoryIcon || '🥩'}</span>
+              <span className="text-white text-sm font-medium flex-1">{p.name}</span>
+              <span className="text-white font-bold font-mono">₹{p.pricePerKg}/kg</span>
+              <span className={clsx('text-[9px] font-bold px-2 py-0.5 rounded-full',
+                p.stockStatus === 'IN_STOCK'   ? 'bg-green-400/20 text-green-300' :
+                p.stockStatus === 'LOW_STOCK'  ? 'bg-amber-400/20 text-amber-300' :
+                'bg-red-400/20 text-red-300')}>
+                {p.stockStatus?.replace('_', ' ')}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Scrolling price marquee */}
+      <div className="absolute bottom-0 left-0 right-0 bg-brand-500/90 backdrop-blur-sm py-2.5 overflow-hidden whitespace-nowrap">
+        <div className="inline-flex" style={{ animation: 'marquee 25s linear infinite' }}>
+          {[...(products || []), ...(products || [])].map((p, i) => (
+            <span key={i} className="inline-flex items-center gap-2 text-white text-sm font-medium px-6">
+              {p.categoryIcon} {p.name}
+              <span className="opacity-60 text-xs">₹{p.pricePerKg}/kg</span>
+              <span className="opacity-30 mx-2">·</span>
+            </span>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHOP SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+function ShopSection({ products, categories }) {
+  const [catFilter, setCatFilter] = useState('all');
+  const { addItem, changeQty, items } = useCartStore();
+  const [sectionRef, sectionVisible] = useInView();
+
+  const filtered = (products || []).filter(p =>
+    (catFilter === 'all' || p.categoryId === Number(catFilter)) && p.available
+  );
+
+  return (
+    <section ref={sectionRef} id="shop" className="py-16 bg-[#faf6f1]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        {/* Header */}
+        <div className="mb-8" style={reveal(sectionVisible, 0)}>
+          <p className="text-xs font-bold text-brand-500 uppercase tracking-widest mb-2">Order Online</p>
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-stone-900 mb-3">
+            Fresh items — order &amp; collect at dispatch
+          </h2>
+          <p className="text-stone-500 text-base max-w-xl">
+            Add items to cart, pay online, and collect from our <strong>Dispatch Counter</strong> — no queue, no waiting.
+          </p>
+        </div>
+
+        {/* Category tabs */}
+        <div className="flex flex-wrap gap-2 mb-6" style={reveal(sectionVisible, 80)}>
+          {[{ id: 'all', name: 'All Items', icon: '🥩' }, ...(categories || [])].map(c => (
+            <button key={c.id} onClick={() => setCatFilter(String(c.id))}
+              className={clsx('flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition',
+                String(catFilter) === String(c.id)
+                  ? 'bg-brand-500 text-white shadow-brand'
+                  : 'bg-white text-stone-600 border border-stone-200 hover:border-brand-300 hover:text-brand-600')}>
+              {c.icon} {c.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Product grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {filtered.map((product, i) => {
+            const cartItem = items[product.id];
+            const isOut = product.stockStatus === 'OUT_OF_STOCK';
+            return (
+              <div key={product.id}
+                style={reveal(sectionVisible, 120 + i * 40)}
+                className="bg-white rounded-2xl border border-stone-100 shadow-card hover:shadow-card-hover transition-shadow overflow-hidden group">
+                {/* Image */}
+                <div className="relative overflow-hidden h-36 sm:h-44 bg-brand-50">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-5xl">
+                      {product.categoryIcon || '🥩'}
+                    </div>
+                  )}
+                  <span className={clsx('absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full',
+                    isOut ? 'bg-stone-900/70 text-white' :
+                    product.stockStatus === 'LOW_STOCK' ? 'bg-amber-400 text-amber-900' :
+                    'bg-green-400/90 text-green-900')}>
+                    {isOut ? 'Sold Out' : product.stockStatus === 'LOW_STOCK' ? 'Low Stock' : 'In Stock'}
+                  </span>
+                </div>
+
+                {/* Info */}
+                <div className="p-3">
+                  <p className="text-sm font-bold text-stone-800 leading-tight mb-0.5">{product.name}</p>
+                  <p className="text-xs text-stone-400 mb-2 line-clamp-1">{product.description}</p>
+                  <span className="text-base font-bold text-brand-500">
+                    ₹{product.pricePerKg}<span className="text-xs text-stone-400 font-normal">/kg</span>
+                  </span>
+                  <div className="mt-3">
+                    {isOut ? (
+                      <button disabled className="w-full bg-stone-100 text-stone-400 rounded-lg py-2 text-xs font-semibold cursor-not-allowed">
+                        Out of Stock
+                      </button>
+                    ) : !cartItem ? (
+                      <button
+                        onClick={() => { addItem(product); toast.success(`${product.name} added!`, { icon: product.categoryIcon }); }}
+                        className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 text-xs font-bold transition">
+                        + Add to Cart
+                      </button>
+                    ) : (
+                      <div className="flex items-center border border-brand-300 rounded-lg overflow-hidden">
+                        <button onClick={() => changeQty(product.id, -(product.orderStep || 0.5))}
+                          className="flex-none px-2.5 py-1.5 text-brand-600 hover:bg-brand-50 transition">
+                          <Minus size={13} />
+                        </button>
+                        <span className="flex-1 text-center text-sm font-bold text-stone-800 font-mono">
+                          {cartItem.qty}kg
+                        </span>
+                        <button onClick={() => changeQty(product.id, product.orderStep || 0.5)}
+                          className="flex-none px-2.5 py-1.5 text-brand-600 hover:bg-brand-50 transition">
+                          <Plus size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// REVIEWS SECTION
+// ═══════════════════════════════════════════════════════════════════════════════
+function ReviewsSection({ reviews, onRate }) {
+  const [sectionRef, visible] = useInView();
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (!reviews?.length) return;
+    const t = setInterval(() => setIdx(i => (i + 1) % reviews.length), 4000);
+    return () => clearInterval(t);
+  }, [reviews?.length]);
+
+  const avg = reviews?.length
+    ? (reviews.reduce((s, r) => s + r.rating, 0) / reviews.length).toFixed(1)
+    : '—';
+
+  return (
+    <section ref={sectionRef} id="reviews" className="py-16 bg-white">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-10"
+          style={reveal(visible, 0)}>
+          <div>
+            <p className="text-xs font-bold text-brand-500 uppercase tracking-widest mb-2">Happy Customers</p>
+            <h2 className="font-display text-3xl sm:text-4xl font-bold text-stone-900">What our regulars say</h2>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-center">
+              <p className="text-4xl font-display font-bold text-stone-900">{avg}</p>
+              <p className="text-brand-400 text-lg">
+                {'★'.repeat(Math.round(Number(avg) || 0))}{'☆'.repeat(5 - Math.round(Number(avg) || 0))}
+              </p>
+              <p className="text-xs text-stone-400">{reviews?.length || 0} reviews</p>
+            </div>
+            <button onClick={onRate}
+              className="bg-brand-500 hover:bg-brand-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-brand transition flex items-center gap-1.5">
+              <Star size={14} /> Rate Us
+            </button>
+          </div>
+        </div>
+
+        {/* Carousel */}
+        <div className="relative overflow-hidden" style={reveal(visible, 120)}>
+          <div className="flex gap-4 transition-transform duration-500"
+            style={{ transform: `translateX(-${idx * (100 / 3)}%)` }}>
+            {[...(reviews || []), ...(reviews || [])].map((r, i) => (
+              <div key={i}
+                className="flex-none w-full sm:w-[calc(50%-8px)] lg:w-[calc(33.33%-12px)] bg-[#faf6f1] rounded-2xl p-5 border border-stone-100">
+                <div className="text-brand-400 text-lg mb-3">
+                  {'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}
+                </div>
+                <p className="text-stone-600 text-sm leading-relaxed italic mb-4">
+                  "{r.comment || 'Great experience!'}"
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-600 text-sm font-bold">
+                    {(r.name || 'C')[0]}
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-stone-800">{r.name || 'Customer'}</p>
+                    <div className="flex flex-wrap gap-1 mt-0.5">
+                      {(r.tags || []).slice(0, 2).map((t, ti) => (
+                        <span key={ti} className="text-[10px] bg-brand-50 text-brand-600 px-1.5 py-0.5 rounded-full">{t}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Dots */}
+        <div className="flex justify-center gap-1.5 mt-5">
+          {(reviews || []).map((_, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className={clsx('w-2 h-2 rounded-full transition',
+                i === idx % Math.max(1, reviews?.length || 1) ? 'bg-brand-500' : 'bg-stone-200')} />
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONTACT + MAP  — opacity fix: pure CSS reveal, no GSAP
+// ═══════════════════════════════════════════════════════════════════════════════
+function ContactSection({ settings }) {
+  const [sectionRef, visible] = useInView();
+
+  const info = [
+    {
+      icon: MapPin, label: 'Address', color: 'brand',
+      value: settings?.address || 'Fish Market Road, Hyderabad',
+    },
+    {
+      icon: Phone, label: 'Phone', color: 'green',
+      value: settings?.phone || '9121200123',
+      href: `tel:+91${(settings?.phone || '9121200123').replace(/\s/g, '')}`,
+    },
+    {
+      icon: Mail, label: 'Email', color: 'blue',
+      value: settings?.email || 'smartmeatshop@gmail.com',
+      href: `mailto:${settings?.email || 'smartmeatshop@gmail.com'}`,
+    },
+    {
+      icon: Clock, label: 'Hours', color: 'amber',
+      value: `Mon–Sat ${settings?.openTime || '7AM'}–${settings?.closeTime || '8PM'} · Sun till ${settings?.sundayClose || '2PM'}`,
+    },
+  ];
+
+  const colorMap = {
+    brand: { bg: 'bg-brand-50',    text: 'text-brand-600'  },
+    green: { bg: 'bg-green-light', text: 'text-green-shop' },
+    blue:  { bg: 'bg-blue-50',     text: 'text-blue-600'   },
+    amber: { bg: 'bg-amber-light', text: 'text-amber-shop' },
+  };
+
+  const lat = settings?.latitude  || 17.393227400000004;
+  const lng = settings?.longitude || 78.53258851083984;
+  //const mapSrc = `https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3806.3!2d${lng}!3d${lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb91a8943f0001%3A0x870a0090e6f5fc17!2sFish%20Market%20Rd%2C%20Hyderabad!5e0!3m2!1sen!2sin!4v1710000000000!5m2!1sen!2sin`;
+const mapSrc=`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d30459.09239759158!2d${lng}!3d${lat}!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3bcb9f3ffd67281d%3A0xed87de4bbebe105e!2sRS%20ROYAL%20MEAT%20MART!5e0!3m2!1sen!2sin!4v1774320086093!5m2!1sen!2sin`;
+  return (
+    <section ref={sectionRef} id="contact" className="py-16 bg-[#faf6f1]">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6">
+
+        {/* Heading */}
+        <div style={reveal(visible, 0)}>
+          <p className="text-xs font-bold text-brand-500 uppercase tracking-widest mb-2">Find Us</p>
+          <h2 className="font-display text-3xl sm:text-4xl font-bold text-stone-900 mb-10">
+            Visit Our Shop
+          </h2>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+
+          {/* Contact cards */}
+          <div className="space-y-3">
+            {info.map(({ icon: Icon, label, value, href, color }, i) => {
+              const c = colorMap[color];
+              const Tag = href ? 'a' : 'div';
+              return (
+                <Tag
+                  key={label}
+                  href={href}
+                  style={reveal(visible, 80 + i * 70)}
+                  className="flex items-start gap-4 bg-white rounded-xl p-4 border border-stone-100 shadow-card hover:shadow-card-hover transition-shadow block"
+                >
+                  <div className={clsx('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', c.bg)}>
+                    <Icon size={18} className={c.text} />
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-stone-400 mb-0.5">{label}</p>
+                    <p className={clsx('text-sm font-medium', href ? c.text : 'text-stone-700')}>
+                      {value}
+                    </p>
+                  </div>
+                </Tag>
+              );
+            })}
+          </div>
+
+          {/* Map */}
+          <div style={reveal(visible, 160)}
+            className="rounded-2xl overflow-hidden border border-stone-200 shadow-card">
+            <iframe
+              src={mapSrc}
+              width="100%" height="300"
+              style={{ border: 0, display: 'block' }}
+              allowFullScreen loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <div className="bg-white px-4 py-3 flex items-center justify-between">
+              <span className="text-xs text-stone-400">
+                {settings?.address?.split(',')[0] || 'RS Royal Meat Mart'},Bagayath, Uppal, Hyderabad
+              </span>
+              <a
+                href={`https://maps.google.com?q=${encodeURIComponent(settings?.address || 'RS ROYAL MEAT MART , BAGAYATH, Uppal, Hyderabad')}`}
+                target="_blank" rel="noreferrer"
+                className="text-xs font-semibold text-brand-500 hover:text-brand-700"
+              >
+                Get Directions →
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CART DRAWER
+// ═══════════════════════════════════════════════════════════════════════════════
+function CartDrawer({ open, onClose, onCheckout }) {
+  const { itemsList, changeQty, removeItem, total, itemCount } = useCartStore();
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />}
+      <div className={clsx(
+        'fixed right-0 top-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300',
+        open ? 'translate-x-0' : 'translate-x-full'
+      )}>
+        {/* Head */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={18} className="text-brand-500" />
+            <h3 className="font-bold text-stone-800">Your Cart</h3>
+            {itemCount() > 0 && (
+              <span className="text-xs bg-brand-100 text-brand-600 font-bold rounded-full px-2 py-0.5">
+                {itemCount()} items
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {itemsList().length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-stone-400 text-center">
+              <ShoppingCart size={48} className="mb-3 opacity-30" />
+              <p className="font-medium">Your cart is empty</p>
+              <p className="text-sm mt-1">Add items from the shop</p>
+              <button onClick={onClose} className="mt-4 text-brand-500 text-sm font-semibold hover:underline">
+                Browse products →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {itemsList().map(({ product, qty }) => (
+                <div key={product.id} className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-100">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+                  ) : (
+                    <div className="w-14 h-14 rounded-lg bg-brand-50 flex items-center justify-center text-2xl flex-shrink-0">
+                      {product.categoryIcon}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-stone-800 truncate">{product.name}</p>
+                    <p className="text-xs text-stone-400">₹{product.pricePerKg}/kg</p>
+                    <div className="flex items-center gap-1 mt-1.5">
+                      <button onClick={() => changeQty(product.id, -(product.orderStep || 0.5))}
+                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
+                        <Minus size={11} />
+                      </button>
+                      <span className="w-10 text-center text-xs font-bold font-mono">{qty}kg</span>
+                      <button onClick={() => changeQty(product.id, product.orderStep || 0.5)}
+                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
+                        <Plus size={11} />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold text-stone-800">₹{(product.pricePerKg * qty).toFixed(0)}</p>
+                    <button onClick={() => removeItem(product.id)} className="text-stone-300 hover:text-red-400 mt-1">
+                      <X size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {itemsList().length > 0 && (
+          <div className="border-t border-stone-200 p-4 space-y-3">
+            <div className="flex justify-between text-sm text-stone-600">
+              <span>Subtotal</span><span>₹{total().toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-base">
+              <span>Total</span>
+              <span className="text-brand-500">₹{total().toFixed(0)}</span>
+            </div>
+            <button onClick={onCheckout}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 font-bold text-sm shadow-brand transition flex items-center justify-center gap-2">
+              Proceed to Checkout <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CHECKOUT MODAL (3 steps)
+// ═══════════════════════════════════════════════════════════════════════════════
+function CheckoutModal({ open, onClose, onSuccess }) {
+  const [step, setStep]         = useState(1);
+  const [payMethod, setPayMethod] = useState('CASH');
+  const [placing, setPlacing]   = useState(false);
+  const [form, setForm]         = useState({ name: '', mobile: '', email: '', notes: '' });
+  const [errors, setErrors]     = useState({});
+  const { itemsList, total, toOrderPayload, clearCart } = useCartStore();
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    if (user) setForm(f => ({ ...f, name: user.name || '', mobile: user.mobile || '' }));
+  }, [user]);
+
+  useEffect(() => {
+    if (open) { setStep(1); setErrors({}); setPayMethod('CASH'); }
+  }, [open]);
+
+  if (!open) return null;
+
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim())                     e.name   = 'Name is required';
+    if (!/^\d{10}$/.test(form.mobile.trim()))  e.mobile = 'Enter valid 10-digit mobile';
+    setErrors(e);
+    return Object.keys(e).length === 0;
+  };
+
+  const handleNext = () => {
+    if (step === 1 && !validate()) return;
+    setStep(s => s + 1);
+  };
+
+  const handlePlace = async () => {
+    setPlacing(true);
+    try {
+      const order = await ordersApi.place(toOrderPayload({ ...form, paymentMethod: payMethod }));
+      clearCart();
+      onClose();
+      onSuccess(order);
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Order failed. Please try again.');
+    } finally {
+      setPlacing(false);
+    }
+  };
+
+  const STEPS = ['Your Details', 'Review Order', 'Payment'];
+  const PAY   = [
+    { value: 'CASH', label: '💵 Cash',  desc: 'Pay at counter'   },
+    { value: 'UPI',  label: '📱 UPI',   desc: 'GPay / PhonePe'   },
+    { value: 'CARD', label: '💳 Card',  desc: 'Debit / Credit'   },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/55 z-[60] flex items-start justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl overflow-hidden"
+        style={{ animation: 'modalFade 0.3s ease both' }}>
+
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 bg-stone-50">
+          <h3 className="text-base font-bold text-stone-800">Checkout</h3>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={20} /></button>
+        </div>
+
+        {/* Step indicators */}
+        <div className="flex px-5 py-3 border-b border-stone-100">
+          {STEPS.map((label, i) => {
+            const n = i + 1;
+            const done   = step > n;
+            const active = step === n;
+            return (
+              <div key={n} className="flex-1 flex flex-col items-center relative">
+                {i < STEPS.length - 1 && (
+                  <div className={clsx(
+                    'absolute top-3.5 left-1/2 right-0 h-0.5 -translate-y-1/2',
+                    done ? 'bg-brand-500' : 'bg-stone-200'
+                  )} />
+                )}
+                <div className={clsx(
+                  'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 border-2 transition-all',
+                  done   ? 'bg-brand-500 border-brand-500 text-white' :
+                  active ? 'bg-white border-brand-500 text-brand-500' :
+                           'bg-white border-stone-200 text-stone-400'
+                )}>
+                  {done ? '✓' : n}
+                </div>
+                <p className={clsx('text-[10px] mt-1 font-medium', active ? 'text-brand-500' : 'text-stone-400')}>
+                  {label}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="p-5">
+          {/* Step 1 */}
+          {step === 1 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-semibold text-stone-500 mb-1.5">Full Name *</label>
+                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                    placeholder="Your name"
+                    className={clsx('w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 transition',
+                      errors.name ? 'border-red-400' : 'border-stone-200 focus:border-brand-400')} />
+                  {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+                </div>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs font-semibold text-stone-500 mb-1.5">Mobile *</label>
+                  <input value={form.mobile}
+                    onChange={e => setForm(f => ({ ...f, mobile: e.target.value.replace(/\D/g,'').slice(0,10) }))}
+                    placeholder="10-digit mobile" type="tel" maxLength={10}
+                    className={clsx('w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 transition',
+                      errors.mobile ? 'border-red-400' : 'border-stone-200 focus:border-brand-400')} />
+                  {errors.mobile && <p className="text-xs text-red-500 mt-1">{errors.mobile}</p>}
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-stone-500 mb-1.5">Email (optional)</label>
+                  <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="For receipt via email" type="email"
+                    className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-stone-500 mb-1.5">Special Instructions (optional)</label>
+                  <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                    placeholder="e.g. Clean and cut the fish" rows={2}
+                    className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition resize-none" />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 2 */}
+          {step === 2 && (
+            <div className="space-y-4">
+              <div className="bg-stone-50 rounded-xl p-3">
+                <p className="font-semibold text-stone-800 text-sm">{form.name}</p>
+                <p className="text-stone-500 text-xs">{form.mobile}{form.email ? ` · ${form.email}` : ''}</p>
+                {form.notes && <p className="text-stone-400 text-xs mt-1">📝 {form.notes}</p>}
+              </div>
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Your Items</p>
+                {itemsList().map(({ product, qty }) => (
+                  <div key={product.id} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-lg">{product.categoryIcon || '🥩'}</span>
+                      <div>
+                        <p className="text-sm font-medium text-stone-800">{product.name}</p>
+                        <p className="text-xs text-stone-400">{qty} kg × ₹{product.pricePerKg}/kg</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-bold text-stone-800">₹{(product.pricePerKg * qty).toFixed(0)}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center pt-2 border-t border-stone-200">
+                <span className="font-bold text-stone-800">Total</span>
+                <span className="text-xl font-bold text-brand-500">₹{total().toFixed(0)}</span>
+              </div>
+              <div className="bg-green-light border border-green-200 rounded-xl p-3 flex gap-2.5">
+                <span className="text-lg flex-shrink-0">🏪</span>
+                <div>
+                  <p className="text-xs font-bold text-green-shop">Collect at Dispatch Counter</p>
+                  <p className="text-xs text-stone-500 mt-0.5">Ready in 20–30 min. Skip the queue!</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3 */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Choose Payment Method</p>
+              <div className="space-y-2">
+                {PAY.map(opt => (
+                  <button key={opt.value} onClick={() => setPayMethod(opt.value)}
+                    className={clsx('w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition',
+                      payMethod === opt.value ? 'border-brand-500 bg-brand-50' : 'border-stone-200 hover:border-stone-300 bg-white')}>
+                    <span className="text-2xl">{opt.label.split(' ')[0]}</span>
+                    <div className="flex-1">
+                      <p className={clsx('text-sm font-bold', payMethod === opt.value ? 'text-brand-600' : 'text-stone-700')}>
+                        {opt.label.split(' ').slice(1).join(' ')}
+                      </p>
+                      <p className="text-xs text-stone-400">{opt.desc}</p>
+                    </div>
+                    <div className={clsx('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
+                      payMethod === opt.value ? 'border-brand-500 bg-brand-500' : 'border-stone-300')}>
+                      {payMethod === opt.value && <div className="w-2 h-2 rounded-full bg-white" />}
+                    </div>
+                  </button>
+                ))}
+              </div>
+              <div className="bg-stone-50 rounded-xl p-4 flex justify-between items-center">
+                <span className="text-sm font-semibold text-stone-600">Amount to pay</span>
+                <span className="text-2xl font-bold text-brand-500">₹{total().toFixed(0)}</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Buttons */}
+        <div className="flex gap-3 px-5 pb-5">
+          {step > 1 && (
+            <button onClick={() => setStep(s => s - 1)}
+              className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 transition">
+              ← Back
+            </button>
+          )}
+          {step < 3 ? (
+            <button onClick={handleNext}
+              className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition flex items-center justify-center gap-2 shadow-brand">
+              Continue →
+            </button>
+          ) : (
+            <button onClick={handlePlace} disabled={placing}
+              className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition flex items-center justify-center gap-2 shadow-brand disabled:opacity-60">
+              {placing
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Placing…</>
+                : '✓ Place Order'}
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RECEIPT MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+function ReceiptModal({ order, open, onClose, onRate }) {
+  if (!open || !order) return null;
+  return (
+    <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl w-full max-w-sm my-8 shadow-2xl overflow-hidden"
+        style={{ animation: 'modalFade 0.3s ease both' }}>
+        <div className="bg-gradient-to-br from-brand-500 to-brand-400 px-6 pt-8 pb-6 text-white text-center">
+          <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">✓</div>
+          <h2 className="font-display text-2xl font-bold mb-1">Order Confirmed!</h2>
+          <p className="text-sm opacity-80">Smart Meat Shop</p>
+          <div className="mt-3 bg-white/20 rounded-xl px-4 py-2 inline-block font-mono font-bold tracking-wide">
+            {order.orderNumber}
+          </div>
+        </div>
+        <div className="p-5">
+          <div className="bg-green-light border border-green-200 rounded-xl p-3 flex gap-2.5 mb-4">
+            <span className="text-xl flex-shrink-0">🏪</span>
+            <div>
+              <p className="text-xs font-bold text-green-shop">Collect at Dispatch Counter</p>
+              <p className="text-xs text-stone-500 mt-0.5">Show this screen. Ready in 20–30 min.</p>
+            </div>
+          </div>
+          <div className="space-y-1.5 mb-4">
+            {(order.items || []).map((item, i) => (
+              <div key={i} className="flex justify-between text-sm">
+                <span className="text-stone-600">{item.productName} × {item.qty}kg</span>
+                <span className="font-semibold text-stone-800">₹{Number(item.total).toLocaleString('en-IN')}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between items-center border-t border-stone-200 pt-3 mb-4">
+            <span className="font-bold text-stone-800">Total Paid</span>
+            <span className="text-xl font-bold text-brand-500">₹{Number(order.total).toLocaleString('en-IN')}</span>
+          </div>
+          <div className="text-xs text-stone-400 flex justify-between mb-5">
+            <span>{order.customerName} · {order.customerMobile}</span>
+            <span>{order.paymentMethod}</span>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => window.print()}
+              className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 transition">
+              🖨 Print
+            </button>
+            <button onClick={() => { onClose(); setTimeout(onRate, 400); }}
+              className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition">
+              Done ✓
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// RATING MODAL
+// ═══════════════════════════════════════════════════════════════════════════════
+function RatingModal({ open, onClose }) {
+  const [rating,    setRating]    = useState(0);
+  const [hovered,   setHovered]   = useState(0);
+  const [tags,      setTags]      = useState([]);
+  const [name,      setName]      = useState('');
+  const [comment,   setComment]   = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const { user } = useAuthStore();
+
+  useEffect(() => {
+    if (open) {
+      setRating(0); setHovered(0); setTags([]);
+      setName(user?.name || ''); setComment(''); setSubmitted(false);
+    }
+  }, [open, user]);
+
+  if (!open) return null;
+
+  const HIGH = ['Fresh quality','Great prices','Fast service','Friendly staff','Easy ordering','Clean shop'];
+  const LOW  = ['Freshness','Waiting time','Staff attitude','Cleanliness','Packaging','Price value'];
+  const opts = rating >= 4 ? HIGH : LOW;
+  const labels = ['','Terrible','Poor','Average','Good','Excellent! 😊'];
+
+  const toggleTag = (t) => setTags(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+
+  const submit = async () => {
+    if (!rating) { toast.error('Please select a rating'); return; }
+    try {
+      await reviewsApi.submit({ rating, comment, name, tags });
+      setSubmitted(true);
+    } catch {
+      toast.error('Could not submit review. Please try again.');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/55 z-[70] flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
+        style={{ animation: 'modalFade 0.3s ease both' }}>
+        <div className="bg-gradient-to-br from-brand-500 to-brand-400 px-6 py-5 text-white text-center">
+          <div className="text-3xl mb-1">⭐</div>
+          <h3 className="font-display text-xl font-bold">Rate Your Experience</h3>
+          <p className="text-sm opacity-80 mt-1">Your feedback helps us serve you better</p>
+        </div>
+        <div className="p-5">
+          {submitted ? (
+            <div className="text-center py-6">
+              <div className="text-5xl mb-3">🎉</div>
+              <h4 className="text-lg font-bold text-stone-800 mb-2">Thank you!</h4>
+              <p className="text-sm text-stone-500 mb-5">Your review has been submitted.</p>
+              <button onClick={onClose}
+                className="bg-brand-500 hover:bg-brand-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold transition">
+                Close
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <div className="text-center">
+                <p className="text-xs font-semibold text-stone-500 mb-3 uppercase tracking-wide">
+                  How was your experience?
+                </p>
+                <div className="flex justify-center gap-2 mb-2">
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n}
+                      onMouseEnter={() => setHovered(n)}
+                      onMouseLeave={() => setHovered(0)}
+                      onClick={() => setRating(n)}
+                      className="text-4xl transition-transform hover:scale-110 active:scale-95"
+                      style={{ filter: (hovered || rating) >= n ? 'none' : 'grayscale(1)', color: '#f59e0b' }}>
+                      ★
+                    </button>
+                  ))}
+                </div>
+                {(hovered || rating) > 0 && (
+                  <p className="text-sm font-semibold text-brand-500">{labels[hovered || rating]}</p>
+                )}
+              </div>
+
+              {rating > 0 && (
+                <>
+                  <div>
+                    <p className="text-xs font-semibold text-stone-500 mb-2 uppercase tracking-wide">
+                      {rating >= 4 ? 'What did you love?' : 'What could we improve?'}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {opts.map(t => (
+                        <button key={t} onClick={() => toggleTag(t)}
+                          className={clsx('px-3 py-1.5 rounded-full text-xs font-semibold border transition',
+                            tags.includes(t)
+                              ? 'bg-brand-500 text-white border-brand-500'
+                              : 'bg-white text-stone-600 border-stone-200 hover:border-brand-300')}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-500 mb-1.5">Your Name</label>
+                    <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Ravi Kumar"
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-500 mb-1.5">Tell us more (optional)</label>
+                    <textarea value={comment} onChange={e => setComment(e.target.value)}
+                      placeholder="Share your experience…" rows={3}
+                      className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition resize-none" />
+                  </div>
+                </>
+              )}
+
+              <div className="flex gap-3 pt-1">
+                <button onClick={onClose}
+                  className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm font-medium text-stone-500 hover:bg-stone-50 transition">
+                  Skip
+                </button>
+                <button onClick={submit} disabled={!rating}
+                  className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition disabled:opacity-50">
+                  Submit Review
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MAIN PAGE
+// ═══════════════════════════════════════════════════════════════════════════════
+export default function HomePage() {
+  const [loaded,           setLoaded]           = useState(false);
+  const [cartOpen,         setCartOpen]         = useState(false);
+  const [checkoutOpen,     setCheckoutOpen]     = useState(false);
+  const [receiptOrder,     setReceiptOrder]     = useState(null);
+  const [receiptOpen,      setReceiptOpen]      = useState(false);
+  const [ratingOpen,       setRatingOpen]       = useState(false);
+  const [scrollTopVisible, setScrollTopVisible] = useState(false);
+  const { itemCount } = useCartStore();
+
+  const { data: shopSettings } = useQuery('shop-settings', shopApi.getSettings, { staleTime: 0 });
+  const { data: products = [] } = useQuery('products-public', () => productsApi.getAll({ status: 'available' }), { staleTime: 30000 });
+  const { data: categories = [] } = useQuery('categories', categoriesApi.getAll, { staleTime: 300000 });
+  const { data: reviews = [] }   = useQuery('reviews-public', reviewsApi.getPublic, { staleTime: 60000 });
+
+  useEffect(() => {
+    const fn = () => setScrollTopVisible(window.scrollY > 500);
+    window.addEventListener('scroll', fn, { passive: true });
+    return () => window.removeEventListener('scroll', fn);
+  }, []);
+
+  return (
+    <>
+      {!loaded && <SiteLoader onDone={() => setLoaded(true)} />}
+
+      <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.5s ease' }}>
+        <Navbar cartCount={itemCount()} onOpenCart={() => setCartOpen(true)} />
+
+        <Hero settings={shopSettings} products={products} />
+
+        <ShopSection products={products} categories={categories} />
+
+        <ReviewsSection reviews={reviews} onRate={() => setRatingOpen(true)} />
+
+        <ContactSection settings={shopSettings} />
+
+        {/* Footer */}
+        <footer className="bg-stone-900 text-white/60 py-10 px-4">
+          <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
+            <div>
+              <p className="font-display text-lg font-bold text-white mb-2">🥩 Smart Meat Shop</p>
+              <p className="text-sm leading-relaxed">
+                Fresh fish, chicken &amp; mutton sourced daily. Quality you can taste.
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Contact</p>
+              <p className="text-sm flex items-center gap-1.5 mb-1">
+                <Phone size={12} /> {shopSettings?.phone || '9121200123'}
+              </p>
+              <p className="text-sm flex items-center gap-1.5">
+                <Mail size={12} /> {shopSettings?.email || 'smartmeatshop@gmail.com'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Hours</p>
+              <p className="text-sm">Mon–Sat: {shopSettings?.openTime || '7AM'} – {shopSettings?.closeTime || '8PM'}</p>
+              <p className="text-sm">Sunday: {shopSettings?.openTime || '7AM'} – {shopSettings?.sundayClose || '2PM'}</p>
+            </div>
+          </div>
+          <div className="max-w-6xl mx-auto border-t border-white/10 mt-8 pt-6 flex justify-between items-center text-xs">
+            <span>© 2026 Smart Meat Shop</span>
+            <Link to="/login" className="text-white/40 hover:text-white transition">Admin Login</Link>
+          </div>
+        </footer>
+
+        {/* Modals */}
+        <CartDrawer
+          open={cartOpen}
+          onClose={() => setCartOpen(false)}
+          onCheckout={() => { setCartOpen(false); setCheckoutOpen(true); }}
+        />
+        <CheckoutModal
+          open={checkoutOpen}
+          onClose={() => setCheckoutOpen(false)}
+          onSuccess={(order) => { setCheckoutOpen(false); setReceiptOrder(order); setReceiptOpen(true); }}
+        />
+        <ReceiptModal
+          open={receiptOpen}
+          order={receiptOrder}
+          onClose={() => setReceiptOpen(false)}
+          onRate={() => setRatingOpen(true)}
+        />
+        <RatingModal open={ratingOpen} onClose={() => setRatingOpen(false)} />
+
+        {/* Scroll to top */}
+        {scrollTopVisible && (
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-6 right-6 z-40 w-11 h-11 bg-brand-500 hover:bg-brand-600 text-white rounded-full shadow-brand flex items-center justify-center transition"
+            style={{ animation: 'modalFade 0.3s ease both' }}
+          >
+            <ChevronUp size={20} />
+          </button>
+        )}
+      </div>
+
+      {/* ── Global keyframes — defined once, no GSAP ── */}
+      <style>{`
+        @keyframes heroFade {
+          from { opacity: 0; transform: translateY(24px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes modalFade {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0);    }
+        }
+        @keyframes marquee {
+          from { transform: translateX(0);    }
+          to   { transform: translateX(-50%); }
+        }
+        @keyframes blink {
+          0%,100% { opacity: 1; }
+          50%     { opacity: 0.3; }
+        }
+      `}</style>
+    </>
+  );
+}
