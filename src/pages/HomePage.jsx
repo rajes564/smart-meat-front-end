@@ -1111,7 +1111,7 @@ export default function HomePage() {
         <footer className="bg-stone-900 text-white/60 py-10 px-4">
           <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
             <div>
-              <p className="font-display text-lg font-bold text-white mb-2">🥩 Smart Meat Shop</p>
+              <p className="font-display text-lg font-bold text-white mb-2">🥩 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}</p>
               <p className="text-sm leading-relaxed">
                 Fresh fish, chicken &amp; mutton sourced daily. Quality you can taste.
               </p>
@@ -1119,10 +1119,10 @@ export default function HomePage() {
             <div>
               <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Contact</p>
               <p className="text-sm flex items-center gap-1.5 mb-1">
-                <Phone size={12} /> {shopSettings?.phone || '9121200123'}
+                <Phone size={12} /> {shopSettings?.phone || '9000474104'}
               </p>
               <p className="text-sm flex items-center gap-1.5">
-                <Mail size={12} /> {shopSettings?.email || 'smartmeatshop@gmail.com'}
+                <Mail size={12} /> {shopSettings?.email || 'rsroyalmeat@gmail.com'}
               </p>
             </div>
             <div>
@@ -1132,8 +1132,10 @@ export default function HomePage() {
             </div>
           </div>
           <div className="max-w-6xl mx-auto border-t border-white/10 mt-8 pt-6 flex justify-between items-center text-xs">
-            <span>© 2026 Smart Meat Shop</span>
-            <Link to="/login" className="text-white/40 hover:text-white transition">Admin Login</Link>
+            <span>© 2026 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}</span>
+            <span className='flex items-center g-5'>From our shop to your plate, with <span className='text-xl text-red-500'>❤️</span></span>
+            <span className='flex items-center g-5'>Keerthu's Soft Solution ®</span>
+            {/* <Link to="/login" className="text-white/40 hover:text-white transition">Admin Login</Link> */}
           </div>
         </footer>
 
