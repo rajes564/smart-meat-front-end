@@ -243,6 +243,57 @@ export default function ShopSettings() {
         </div>
       ))}
 
+      {/* ── Opening / Current Balances ── */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-5">
+        <div className="flex items-start justify-between mb-1">
+          <div>
+            <p className="text-sm font-bold text-stone-700">Cash &amp; Account Balances</p>
+            <p className="text-xs text-stone-400 mt-0.5">
+              Set the current actual balance in your cash drawer and bank/UPI account.
+              These values update automatically with every sale, purchase, and expense.
+              Use these fields only to correct opening balances.
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+          <div>
+            <label className="block text-xs font-semibold text-stone-500 mb-1.5 flex items-center gap-1">
+              💵 Cash Balance (₹)
+            </label>
+            <input
+              type="number" step="0.01" min="0"
+              {...register('cashBalance', { valueAsNumber: true })}
+              placeholder="0.00"
+              className={inputCls + ' font-mono'}
+            />
+            <p className="text-[10px] text-stone-400 mt-1">
+              Physical cash in your drawer right now
+            </p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-stone-500 mb-1.5 flex items-center gap-1">
+              💳 Account / UPI Balance (₹)
+            </label>
+            <input
+              type="number" step="0.01" min="0"
+              {...register('accountBalance', { valueAsNumber: true })}
+              placeholder="0.00"
+              className={inputCls + ' font-mono'}
+            />
+            <p className="text-[10px] text-stone-400 mt-1">
+              Balance in your bank / UPI account
+            </p>
+          </div>
+        </div>
+        <div className="mt-3 bg-blue-50 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-blue-700 flex items-start gap-2">
+          <span className="text-base">ℹ️</span>
+          <span>
+            These balances are also visible and adjustable from the
+            <strong> Inventory → Dashboard</strong> page in real-time.
+          </span>
+        </div>
+      </div>
+
       {/* Shop status */}
       <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-5">
         <p className="text-sm font-bold text-stone-700 mb-1">Shop Status</p>

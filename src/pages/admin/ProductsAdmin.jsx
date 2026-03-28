@@ -125,12 +125,11 @@ function ProductModal({ product, categories, onClose }) {
             </div>
 
             {[
-              { key: 'pricePerKg',    label: 'Price / kg (₹) *',    required: true },
-              { key: 'costPerKg',     label: 'Cost / kg (₹)',        required: false },
-              { key: 'stockQty',      label: 'Stock Qty (kg)',        required: false },
-              { key: 'minStockLevel', label: 'Min Stock Level',       required: false },
-              { key: 'minOrderQty',   label: 'Min Order Qty',        required: false },
-              { key: 'orderStep',     label: 'Order Step',           required: false },
+              { key: 'pricePerKg',    label: 'Price / kg (₹) *',  required: true  },
+              { key: 'costPerKg',     label: 'Cost / kg (₹)',      required: false },
+              { key: 'minStockLevel', label: 'Min Stock Level',    required: false },
+              { key: 'minOrderQty',   label: 'Min Order Qty',      required: false },
+              { key: 'orderStep',     label: 'Order Step',         required: false },
             ].map(({ key, label, required }) => (
               <div key={key}>
                 <label className="block text-xs font-semibold text-stone-500 mb-1">{label}</label>
@@ -138,6 +137,11 @@ function ProductModal({ product, categories, onClose }) {
                   className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-400" />
               </div>
             ))}
+            <div className="col-span-2">
+              <p className="text-[10px] text-stone-400 bg-stone-50 rounded-lg px-3 py-2 border border-stone-200">
+                📦 Stock quantity is managed through <strong>Inventory → Add Purchase</strong>. Adding a product starts it at 0 stock.
+              </p>
+            </div>
           </div>
 
           <div className="flex gap-3 pt-2">

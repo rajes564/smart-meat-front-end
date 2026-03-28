@@ -1,6 +1,6 @@
 import React from 'react';
 import { useQuery } from 'react-query';
-import { reportsApi, ordersApi, supplierApi } from '../../services/api';
+import { reportsApi, ordersApi, shopApi } from '../../services/api';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { TrendingUp, ShoppingCart, DollarSign, AlertTriangle, Package, Banknote, CreditCard, Wallet } from 'lucide-react';
 import { clsx } from 'clsx';
@@ -68,12 +68,14 @@ export default function Dashboard() {
     staleTime: 15000,
   });
 
-  const { data: balances } = useQuery('shop-balances', supplierApi.getBalances, {
-    staleTime: 30000,
+  // Balances come from shop settings (updated on every sale/purchase/expense)
+  const { data: shopSettings } = useQuery('shop-settings-admin', shopApi.getSettings, {
+    staleTime: 10000,
   });
 
-  const cashBalance    = Number(balances?.cashBalance    || 0);
-  const accountBalance = Number(balances?.accountBalance || 0);
+  const cashBalance    = Number(shopSettings?.cashBalance    || 0);
+  const accountBalance = Number(shopSettings?.accountBalance || 0);
+  const totalBalance   = cashBalance + accountBalance;
 
   const fmt = (n) => '₹' + Number(n || 0).toLocaleString('en-IN');
 
