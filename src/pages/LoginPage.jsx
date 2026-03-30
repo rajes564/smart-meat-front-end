@@ -6,6 +6,7 @@ import { useAuthStore } from '../store';
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+
 // ── Login Page ────────────────────────────────────────────────────────────────
 export function LoginPage() {
   const { register, handleSubmit, formState: { errors } } = useForm();
@@ -41,14 +42,26 @@ export function LoginPage() {
       >
         <Link
           to="/"
-          className="flex items-center gap-2 text-stone-500 hover:text-stone-800 text-sm mb-6 transition"
+          className="flex items-center gap-2 text-stone-800 hover:text-stone-800 text-sm mb-6 transition"
         >
           <ArrowLeft size={15} /> Back to home
         </Link>
 
         <div className="text-center mb-8">
-          <span className="text-4xl">🥩</span>
-          <h1 className="font-display text-2xl font-bold text-stone-900 mt-2">Smart Meat Shop</h1>
+
+
+           {/* <img 
+            src="/images/meat_logo.jpg"
+            alt="Shop Logo"
+            className="w-32 h-32 object-cover rounded-xl"
+          /> */}
+           <img 
+         src="/images/meat_logo.jpg"
+            alt="Shop Logo" 
+            className=" object-cover rounded-xl inline-block"
+
+          />
+          <h1 className="font-display text-2xl font-bold text-stone-900 mt-2">RS ROYAL MEAT MART</h1>
           <p className="text-sm text-stone-400 mt-1">Sign in to your account</p>
         </div>
 
@@ -56,7 +69,7 @@ export function LoginPage() {
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {/* Mobile */}
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">
                 Mobile Number
               </label>
               <input
@@ -78,7 +91,7 @@ export function LoginPage() {
 
             {/* Password */}
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">
                 Password
               </label>
               <div className="relative">
@@ -177,7 +190,7 @@ export function RegisterPage() {
       >
         <Link
           to="/"
-          className="flex items-center gap-2 text-stone-500 hover:text-stone-800 text-sm mb-6 transition"
+          className="flex items-center gap-2 text-stone-800 hover:text-stone-800 text-sm mb-6 transition"
         >
           <ArrowLeft size={15} /> Back to home
         </Link>
@@ -191,7 +204,7 @@ export function RegisterPage() {
         <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-6">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Full Name *</label>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">Full Name *</label>
               <input
                 {...register('name', { required: 'Name is required', minLength: 2 })}
                 placeholder="Your full name"
@@ -205,7 +218,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Mobile Number *</label>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">Mobile Number *</label>
               <input
                 {...register('mobile', {
                   required: 'Mobile is required',
@@ -224,7 +237,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Email (optional)</label>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">Email (optional)</label>
               <input
                 {...register('email')}
                 type="email"
@@ -236,7 +249,7 @@ export function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-stone-500 mb-1.5">Password *</label>
+              <label className="block text-xs font-semibold text-stone-800 mb-1.5">Password *</label>
               <input
                 {...register('password', {
                   required: 'Password is required',

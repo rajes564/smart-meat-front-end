@@ -222,7 +222,7 @@ export default function CashSheet() {
       </div>
 
       {/* ── Table ── */}
-      <div className="bg-white rounded-2xl border border-stone-200 shadow-card overflow-hidden flex-1 flex flex-col" style={{ minHeight: 0 }}>
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-card  flex-1 flex flex-col" >
 
         {loading && (
           <div className="flex items-center justify-center py-16 flex-1">

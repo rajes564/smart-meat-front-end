@@ -1,5 +1,7 @@
 import axios from 'axios';
 
+import { useAuthStore } from '../store';
+
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const api = axios.create({
@@ -128,8 +130,14 @@ export const paymentApi = {
   createOrder: (data) =>
     api.post('/payment/create-order', data).then(r => r.data),
 
-  verifyPayment: (data) =>
-    api.post('/payment/verify', data).then(r => r.data),
+verifyPayment: (data) => {
+  const { user } = useAuthStore.getState();
+  const endpoint = user?.role === 'ADMIN'
+    ? '/payment/verify-by-admin'
+    : '/payment/verify';
+  return api.post(endpoint, data).then(r => r.data);
+},
+
 };
 
 // ── Users (admin only) ────────────────────────────────────────────────────────
