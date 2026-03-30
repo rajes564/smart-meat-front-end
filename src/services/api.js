@@ -123,6 +123,15 @@ export const reviewsApi = {
   delete:    (id)    => api.delete(`/reviews/${id}`),
 };
 
+
+export const paymentApi = {
+  createOrder: (data) =>
+    api.post('/payment/create-order', data).then(r => r.data),
+
+  verifyPayment: (data) =>
+    api.post('/payment/verify', data).then(r => r.data),
+};
+
 // ── Users (admin only) ────────────────────────────────────────────────────────
 export const usersApi = {
   getAll:    ()      => api.get('/users').then(r => r.data),

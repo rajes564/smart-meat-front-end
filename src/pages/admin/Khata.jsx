@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
+import SplitPayment, { computeSplit } from '../../components/SplitPayment';
 
 // ── New Account Modal ─────────────────────────────────────────────────────────
 function NewAccountModal({ onClose }) {
@@ -227,16 +228,52 @@ function LedgerModal({ accountId, onClose }) {
     defaultValues: { entryType: 'CREDIT' },
   });
   const entryType = watch('entryType');
+  const amount    = Number(watch('amount') || 0);
 
-  const entryMutation = useMutation(khataApi.addEntry, {
-    onSuccess: () => {
-      qc.invalidateQueries(['khata-ledger', accountId]);
-      qc.invalidateQueries('khata');
-      reset({ entryType });
-      toast.success('Entry recorded!');
-    },
-    onError: (e) => toast.error(e.response?.data?.message || 'Failed'),
-  });
+  // Payment split state — only relevant for CREDIT entries (payment received)
+  const [payState, setPayState] = useState({ mode: 'CASH', cashAmt: '', upiAmt: '' });
+
+  const entryMutation = useMutation(
+    (data) => khataApi.addEntry(data),
+    {
+      onSuccess: () => {
+        qc.invalidateQueries(['khata-ledger', accountId]);
+        qc.invalidateQueries('khata');
+        qc.invalidateQueries('shop-settings-admin');
+        qc.invalidateQueries('shop-balances');
+        reset({ entryType });
+        setPayState({ mode: 'CASH', cashAmt: '', upiAmt: '' });
+        toast.success('Entry recorded!');
+      },
+      onError: (e) => toast.error(e.response?.data?.message || 'Failed'),
+    }
+  );
+
+  const onSubmit = (formData) => {
+    // For CREDIT (payment received), validate and include split info
+    if (formData.entryType === 'CREDIT') {
+      const { isValid, error, cashDelta, accountDelta } = computeSplit(payState, amount);
+      if (!isValid) { toast.error(error); return; }
+      entryMutation.mutate({
+        accountId,
+        entryType:     formData.entryType,
+        amount:        formData.amount,
+        paymentMode:   payState.mode,
+        cashAmount:    cashDelta,
+        accountAmount: accountDelta,
+        description:   formData.description,
+        referenceNote: formData.referenceNote,
+      });
+    } else {
+      // DEBIT (new purchase on Khata) — no cash movement
+      entryMutation.mutate({
+        accountId,
+        entryType:   formData.entryType,
+        amount:      formData.amount,
+        description: formData.description,
+      });
+    }
+  };
 
   if (isLoading) return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center">
@@ -344,7 +381,7 @@ function LedgerModal({ accountId, onClose }) {
 
         {/* Add entry form */}
         <form
-          onSubmit={handleSubmit(d => entryMutation.mutate({ ...d, accountId }))}
+          onSubmit={handleSubmit(onSubmit)}
           className="p-5 border-t border-stone-200 bg-stone-50 space-y-3"
         >
           <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Add Entry</p>
@@ -353,10 +390,11 @@ function LedgerModal({ accountId, onClose }) {
               <label className="block text-xs font-semibold text-stone-400 mb-1">Type</label>
               <select
                 {...register('entryType')}
+                onChange={() => setPayState({ mode: 'CASH', cashAmt: '', upiAmt: '' })}
                 className="w-full border border-stone-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-brand-400 bg-white"
               >
                 <option value="CREDIT">💰 Payment Received</option>
-                <option value="DEBIT">🛒 New Purchase</option>
+                <option value="DEBIT">🛒 New Purchase (Khata)</option>
               </select>
             </div>
             <div>
@@ -365,6 +403,7 @@ function LedgerModal({ accountId, onClose }) {
                 type="number" step="0.01"
                 {...register('amount', { required: true, valueAsNumber: true, min: 0.01 })}
                 placeholder="0.00"
+                onChange={() => setPayState(p => ({ ...p, cashAmt: '', upiAmt: '' }))}
                 className="w-full border border-stone-200 rounded-lg px-2 py-2 text-sm focus:outline-none focus:border-brand-400"
               />
             </div>
@@ -377,6 +416,24 @@ function LedgerModal({ accountId, onClose }) {
               />
             </div>
           </div>
+
+          {/* Payment mode — only for CREDIT (money being received) */}
+          
+            <SplitPayment
+              total={amount}
+              value={payState}
+              onChange={setPayState}
+              label="How is the payment being received?"
+            />
+          
+
+          {/* For DEBIT — informational note */}
+          {entryType === 'DEBIT' && (
+            <p className="text-[10px] text-stone-400 bg-amber-light border border-amber-200 rounded-lg px-3 py-2">
+              📖 This adds to the customer's Khata balance. No cash/account movement until payment is received.
+            </p>
+          )}
+
           <button
             type="submit"
             disabled={entryMutation.isLoading}

@@ -9,6 +9,8 @@ import {
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
+import { useRazorpay } from '../components/useRazorpay';
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // Scroll-reveal hook using IntersectionObserver (no GSAP — no opacity bug)
@@ -63,7 +65,7 @@ function SiteLoader({ onDone }) {
         ))}
       </div>
       <h1 className="font-display text-2xl sm:text-3xl font-bold text-stone-800 mb-1">
-        Smart Meat Shop
+        RS ROYAL MEAT MART
       </h1>
       <p className="text-sm text-stone-400 mb-6">Fresh Fish · Chicken · Mutton · Daily</p>
       <div className="w-40 h-1 bg-stone-200 rounded-full overflow-hidden">
@@ -87,7 +89,7 @@ function SiteLoader({ onDone }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // NAVBAR
 // ═══════════════════════════════════════════════════════════════════════════════
-function Navbar({ cartCount, onOpenCart }) {
+function Navbar({ cartCount, onOpenCart ,settings}) {
   const [scrolled, setScrolled] = useState(false);
   const { user, token } = useAuthStore();
 
@@ -107,10 +109,21 @@ function Navbar({ cartCount, onOpenCart }) {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center text-lg">🥩</div>
+          <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center text-lg"> 
+            {settings?.logoUrl ? (
+    <img 
+      src={settings.logoUrl} 
+      alt="Shop Logo" 
+      className="w-full h-full object-cover rounded-xl"
+
+    />
+  ) : (
+    <span>🥩</span>
+  )}
+          </div>
           <div>
             <p className={clsx('font-display text-base font-bold leading-none transition', scrolled ? 'text-stone-900' : 'text-white')}>
-              Smart Meat Shop
+             RS ROYAL MEAT MART
             </p>
             <p className={clsx('text-[10px] transition', scrolled ? 'text-stone-400' : 'text-white/70')}>
               Fresh · Quality · Daily
@@ -250,21 +263,50 @@ function Hero({ settings, products }) {
   );
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
-// SHOP SECTION
+// SHOP SECTION — with manual qty input
 // ═══════════════════════════════════════════════════════════════════════════════
 function ShopSection({ products, categories }) {
   const [catFilter, setCatFilter] = useState('all');
-  const { addItem, changeQty, items } = useCartStore();
+  const { addItem, changeQty, setQty, items } = useCartStore();
   const [sectionRef, sectionVisible] = useInView();
+  const [editingQty, setEditingQty] = useState({});
 
   const filtered = (products || []).filter(p =>
     (catFilter === 'all' || p.categoryId === Number(catFilter)) && p.available
   );
 
+  const handleManualQtyBlur = (product) => {
+    const raw = editingQty[product.id];
+    const parsed = parseFloat(raw);
+
+    if (!isNaN(parsed) && parsed > 0) {
+      // ✅ use exact value — no rounding to step
+      const final = parseFloat(parsed.toFixed(3));
+      setQty(product.id, final);
+      toast.success(`Qty set to ${final}kg`, { icon: product.categoryIcon || '🥩' });
+    } else {
+      toast.error('Enter a valid quantity greater than 0');
+      // ✅ revert to current qty on invalid input
+      setEditingQty(prev => {
+        const n = { ...prev };
+        delete n[product.id];
+        return n;
+      });
+      return;
+    }
+    setEditingQty(prev => {
+      const n = { ...prev };
+      delete n[product.id];
+      return n;
+    });
+  };
+
   return (
     <section ref={sectionRef} id="shop" className="py-16 bg-[#faf6f1]">
       <div className="max-w-6xl mx-auto px-4 sm:px-6">
+
         {/* Header */}
         <div className="mb-8" style={reveal(sectionVisible, 0)}>
           <p className="text-xs font-bold text-brand-500 uppercase tracking-widest mb-2">Order Online</p>
@@ -272,18 +314,23 @@ function ShopSection({ products, categories }) {
             Fresh items — order &amp; collect at dispatch
           </h2>
           <p className="text-stone-500 text-base max-w-xl">
-            Add items to cart, pay online, and collect from our <strong>Dispatch Counter</strong> — no queue, no waiting.
+            Add items to cart, pay online, and collect from our{' '}
+            <strong>Dispatch Counter</strong> — no queue, no waiting.
           </p>
         </div>
 
         {/* Category tabs */}
         <div className="flex flex-wrap gap-2 mb-6" style={reveal(sectionVisible, 80)}>
           {[{ id: 'all', name: 'All Items', icon: '🥩' }, ...(categories || [])].map(c => (
-            <button key={c.id} onClick={() => setCatFilter(String(c.id))}
-              className={clsx('flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition',
+            <button
+              key={c.id}
+              onClick={() => setCatFilter(String(c.id))}
+              className={clsx(
+                'flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold transition',
                 String(catFilter) === String(c.id)
                   ? 'bg-brand-500 text-white shadow-brand'
-                  : 'bg-white text-stone-600 border border-stone-200 hover:border-brand-300 hover:text-brand-600')}>
+                  : 'bg-white text-stone-600 border border-stone-200 hover:border-brand-300 hover:text-brand-600'
+              )}>
               {c.icon} {c.name}
             </button>
           ))}
@@ -294,24 +341,41 @@ function ShopSection({ products, categories }) {
           {filtered.map((product, i) => {
             const cartItem = items[product.id];
             const isOut = product.stockStatus === 'OUT_OF_STOCK';
+            const step = product.orderStep || 0.5;
+            const isEditing = editingQty[product.id] !== undefined;
+
+            // ✅ live cost — recalculates as cartItem.qty changes in zustand
+            const liveCost = cartItem
+              ? (product.pricePerKg * cartItem.qty).toFixed(0)
+              : null;
+
             return (
-              <div key={product.id}
+              <div
+                key={product.id}
                 style={reveal(sectionVisible, 120 + i * 40)}
                 className="bg-white rounded-2xl border border-stone-100 shadow-card hover:shadow-card-hover transition-shadow overflow-hidden group">
+
                 {/* Image */}
                 <div className="relative overflow-hidden h-36 sm:h-44 bg-brand-50">
                   {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-5xl">
                       {product.categoryIcon || '🥩'}
                     </div>
                   )}
-                  <span className={clsx('absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full',
-                    isOut ? 'bg-stone-900/70 text-white' :
-                    product.stockStatus === 'LOW_STOCK' ? 'bg-amber-400 text-amber-900' :
-                    'bg-green-400/90 text-green-900')}>
+                  <span className={clsx(
+                    'absolute top-2 right-2 text-[9px] font-bold px-2 py-0.5 rounded-full',
+                    isOut
+                      ? 'bg-stone-900/70 text-white'
+                      : product.stockStatus === 'LOW_STOCK'
+                        ? 'bg-amber-400 text-amber-900'
+                        : 'bg-green-400/90 text-green-900'
+                  )}>
                     {isOut ? 'Sold Out' : product.stockStatus === 'LOW_STOCK' ? 'Low Stock' : 'In Stock'}
                   </span>
                 </div>
@@ -320,36 +384,106 @@ function ShopSection({ products, categories }) {
                 <div className="p-3">
                   <p className="text-sm font-bold text-stone-800 leading-tight mb-0.5">{product.name}</p>
                   <p className="text-xs text-stone-400 mb-2 line-clamp-1">{product.description}</p>
-                  <span className="text-base font-bold text-brand-500">
-                    ₹{product.pricePerKg}<span className="text-xs text-stone-400 font-normal">/kg</span>
-                  </span>
-                  <div className="mt-3">
-                    {isOut ? (
-                      <button disabled className="w-full bg-stone-100 text-stone-400 rounded-lg py-2 text-xs font-semibold cursor-not-allowed">
-                        Out of Stock
-                      </button>
-                    ) : !cartItem ? (
-                      <button
-                        onClick={() => { addItem(product); toast.success(`${product.name} added!`, { icon: product.categoryIcon }); }}
-                        className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 text-xs font-bold transition">
-                        + Add to Cart
-                      </button>
-                    ) : (
+
+                  {/* Price row — live cost updates as qty changes */}
+                  <div className="flex items-baseline justify-between mb-3">
+                    <span className="text-base font-bold text-brand-500">
+                      ₹{product.pricePerKg}
+                      <span className="text-xs text-stone-400 font-normal">/kg</span>
+                    </span>
+                    {liveCost && (
+                      <span className="text-xs font-bold text-green-600">
+                        = ₹{liveCost}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Add / Stepper */}
+                  {isOut ? (
+                    <button
+                      disabled
+                      className="w-full bg-stone-100 text-stone-400 rounded-lg py-2 text-xs font-semibold cursor-not-allowed">
+                      Out of Stock
+                    </button>
+                  ) : !cartItem ? (
+                    <button
+                      onClick={() => {
+                        addItem(product);
+                        toast.success(`${product.name} added!`, { icon: product.categoryIcon || '🥩' });
+                      }}
+                      className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-lg py-2 text-xs font-bold transition">
+                      + Add to Cart
+                    </button>
+                  ) : (
+                    <div className="space-y-1.5">
                       <div className="flex items-center border border-brand-300 rounded-lg overflow-hidden">
-                        <button onClick={() => changeQty(product.id, -(product.orderStep || 0.5))}
-                          className="flex-none px-2.5 py-1.5 text-brand-600 hover:bg-brand-50 transition">
+                        {/* Minus */}
+                        <button
+                          onClick={() => changeQty(product.id, -step)}
+                          className="flex-none px-2.5 py-2 text-brand-600 hover:bg-brand-50 active:bg-brand-100 transition">
                           <Minus size={13} />
                         </button>
-                        <span className="flex-1 text-center text-sm font-bold text-stone-800 font-mono">
-                          {cartItem.qty}kg
-                        </span>
-                        <button onClick={() => changeQty(product.id, product.orderStep || 0.5)}
-                          className="flex-none px-2.5 py-1.5 text-brand-600 hover:bg-brand-50 transition">
+
+                        {/* Qty — tap to edit */}
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="any"
+                            value={editingQty[product.id]}
+                            onChange={e =>
+                              setEditingQty(prev => ({
+                                ...prev,
+                                [product.id]: e.target.value,
+                              }))
+                            }
+                            onBlur={() => handleManualQtyBlur(product)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleManualQtyBlur(product);
+                              if (e.key === 'Escape') {
+                                setEditingQty(prev => {
+                                  const n = { ...prev };
+                                  delete n[product.id];
+                                  return n;
+                                });
+                              }
+                            }}
+                            autoFocus
+                            className="flex-1 text-center text-sm font-bold text-brand-700 font-mono bg-brand-50 outline-none border-0 w-0 min-w-0 py-1.5"
+                          />
+                        ) : (
+                          <button
+                            onClick={() =>
+                              setEditingQty(prev => ({
+                                ...prev,
+                                [product.id]: String(cartItem.qty),
+                              }))
+                            }
+                            title="Tap to enter custom quantity"
+                            className="flex-1 text-center text-sm font-bold text-stone-800 font-mono py-1.5 hover:bg-brand-50 transition cursor-text">
+                            {cartItem.qty}kg
+                          </button>
+                        )}
+
+                        {/* Plus */}
+                        <button
+                          onClick={() => changeQty(product.id, step)}
+                          className="flex-none px-2.5 py-2 text-brand-600 hover:bg-brand-50 active:bg-brand-100 transition">
                           <Plus size={13} />
                         </button>
                       </div>
-                    )}
-                  </div>
+
+                      {/* Hint */}
+                      <div className="flex items-center justify-between px-0.5">
+                        <p className="text-[10px] text-stone-400">
+                          {isEditing ? '↵ Enter to confirm' : 'Tap qty to type custom'}
+                        </p>
+                        <p className="text-[10px] font-bold text-brand-400">
+                          step: {step}kg
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             );
@@ -359,6 +493,223 @@ function ShopSection({ products, categories }) {
     </section>
   );
 }
+
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CART DRAWER — with manual qty input, live sync
+// ═══════════════════════════════════════════════════════════════════════════════
+function CartDrawer({ open, onClose, onCheckout }) {
+  const { items, changeQty, setQty, removeItem, total, itemCount } = useCartStore();
+  const [editingQty, setEditingQty] = useState({});
+
+  // ✅ always derived from live zustand items
+  const itemsList = Object.values(items);
+
+  const handleManualQtyBlur = (product) => {
+    const raw = editingQty[product.id];
+    const parsed = parseFloat(raw);
+
+    if (!isNaN(parsed) && parsed > 0) {
+      // ✅ exact value — no rounding
+      const final = parseFloat(parsed.toFixed(3));
+      setQty(product.id, final);
+      toast.success(`Qty updated to ${final}kg`, { icon: '✓' });
+    } else {
+      toast.error('Enter a valid quantity greater than 0');
+    }
+    setEditingQty(prev => {
+      const n = { ...prev };
+      delete n[product.id];
+      return n;
+    });
+  };
+
+  return (
+    <>
+      {open && <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />}
+      <div className={clsx(
+        'fixed right-0 top-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300',
+        open ? 'translate-x-0' : 'translate-x-full'
+      )}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
+          <div className="flex items-center gap-2">
+            <ShoppingCart size={18} className="text-brand-500" />
+            <h3 className="font-bold text-stone-800">Your Cart</h3>
+            {itemCount() > 0 && (
+              <span className="text-xs bg-brand-100 text-brand-600 font-bold rounded-full px-2 py-0.5">
+                {itemCount()} items
+              </span>
+            )}
+          </div>
+          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto p-4">
+          {itemsList.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-full text-stone-400 text-center">
+              <ShoppingCart size={48} className="mb-3 opacity-30" />
+              <p className="font-medium">Your cart is empty</p>
+              <p className="text-sm mt-1">Add items from the shop</p>
+              <button
+                onClick={onClose}
+                className="mt-4 text-brand-500 text-sm font-semibold hover:underline">
+                Browse products →
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {itemsList.map(({ product, qty }) => {
+                const step = product.orderStep || 0.5;
+                const isEditing = editingQty[product.id] !== undefined;
+
+                // ✅ live cost from current qty
+                const liveCost = (product.pricePerKg * qty).toFixed(0);
+
+                return (
+                  <div
+                    key={product.id}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-100">
+
+                    {/* Image */}
+                    {product.imageUrl ? (
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="w-14 h-14 rounded-lg object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-14 h-14 rounded-lg bg-brand-50 flex items-center justify-center text-2xl flex-shrink-0">
+                        {product.categoryIcon || '🥩'}
+                      </div>
+                    )}
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-stone-800 truncate">{product.name}</p>
+                      <p className="text-xs text-stone-400 mb-1.5">
+                        ₹{product.pricePerKg}/kg
+                      </p>
+
+                      {/* Stepper + manual */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => changeQty(product.id, -step)}
+                          className="w-7 h-7 border border-stone-200 rounded-lg flex items-center justify-center hover:bg-red-50 hover:border-red-200 hover:text-red-500 transition">
+                          <Minus size={11} />
+                        </button>
+
+                        {isEditing ? (
+                          <input
+                            type="number"
+                            min="0.001"
+                            step="any"
+                            value={editingQty[product.id]}
+                            onChange={e =>
+                              setEditingQty(prev => ({
+                                ...prev,
+                                [product.id]: e.target.value,
+                              }))
+                            }
+                            onBlur={() => handleManualQtyBlur(product)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleManualQtyBlur(product);
+                              if (e.key === 'Escape') {
+                                setEditingQty(prev => {
+                                  const n = { ...prev };
+                                  delete n[product.id];
+                                  return n;
+                                });
+                              }
+                            }}
+                            autoFocus
+                            className="w-20 text-center text-xs font-bold font-mono border border-brand-400 rounded-lg bg-brand-50 text-brand-700 outline-none px-1 py-1"
+                          />
+                        ) : (
+                          <button
+                            onClick={() =>
+                              setEditingQty(prev => ({
+                                ...prev,
+                                [product.id]: String(qty),
+                              }))
+                            }
+                            title="Tap to enter custom quantity"
+                            className="w-20 text-center text-xs font-bold font-mono border border-stone-200 rounded-lg bg-white hover:border-brand-400 hover:bg-brand-50 hover:text-brand-700 transition py-1 cursor-text">
+                            {qty}kg
+                          </button>
+                        )}
+
+                        <button
+                          onClick={() => changeQty(product.id, step)}
+                          className="w-7 h-7 border border-stone-200 rounded-lg flex items-center justify-center hover:bg-green-50 hover:border-green-200 hover:text-green-600 transition">
+                          <Plus size={11} />
+                        </button>
+                      </div>
+
+                      <p className="text-[10px] text-stone-400 mt-1">
+                        {isEditing
+                          ? '↵ Enter to confirm · Esc to cancel'
+                          : 'Tap qty to type custom amount'}
+                      </p>
+                    </div>
+
+                    {/* ✅ live cost + remove */}
+                    <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
+                      <p className="text-sm font-bold text-stone-800">₹{liveCost}</p>
+                      <p className="text-[10px] text-stone-400">{qty}kg</p>
+                      <button
+                        onClick={() => removeItem(product.id)}
+                        className="text-stone-300 hover:text-red-400 transition mt-0.5">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {itemsList.length > 0 && (
+          <div className="border-t border-stone-200 p-4 space-y-3">
+
+            {/* Per item breakdown */}
+            <div className="space-y-1 pb-2 border-b border-stone-100">
+              {itemsList.map(({ product, qty }) => (
+                <div key={product.id} className="flex justify-between text-xs text-stone-500">
+                  <span>{product.name} × {qty}kg</span>
+                  <span>₹{(product.pricePerKg * qty).toFixed(0)}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex justify-between text-sm text-stone-600">
+              <span>Subtotal</span>
+              <span>₹{total().toFixed(0)}</span>
+            </div>
+            <div className="flex justify-between font-bold text-base">
+              <span>Total</span>
+              <span className="text-brand-500">₹{total().toFixed(0)}</span>
+            </div>
+            <button
+              onClick={onCheckout}
+              className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 font-bold text-sm shadow-brand transition flex items-center justify-center gap-2">
+              Proceed to Checkout <ArrowRight size={15} />
+            </button>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // REVIEWS SECTION
@@ -555,128 +906,128 @@ const mapSrc=`https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d30459.092397
 // ═══════════════════════════════════════════════════════════════════════════════
 // CART DRAWER
 // ═══════════════════════════════════════════════════════════════════════════════
-function CartDrawer({ open, onClose, onCheckout }) {
-  const { itemsList, changeQty, removeItem, total, itemCount } = useCartStore();
+// function CartDrawer({ open, onClose, onCheckout }) {
+//   const { itemsList, changeQty, removeItem, total, itemCount } = useCartStore();
 
-  return (
-    <>
-      {open && <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />}
-      <div className={clsx(
-        'fixed right-0 top-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300',
-        open ? 'translate-x-0' : 'translate-x-full'
-      )}>
-        {/* Head */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
-          <div className="flex items-center gap-2">
-            <ShoppingCart size={18} className="text-brand-500" />
-            <h3 className="font-bold text-stone-800">Your Cart</h3>
-            {itemCount() > 0 && (
-              <span className="text-xs bg-brand-100 text-brand-600 font-bold rounded-full px-2 py-0.5">
-                {itemCount()} items
-              </span>
-            )}
-          </div>
-          <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X size={20} />
-          </button>
-        </div>
+//   return (
+//     <>
+//       {open && <div className="fixed inset-0 bg-black/40 z-40" onClick={onClose} />}
+//       <div className={clsx(
+//         'fixed right-0 top-0 h-full w-full sm:w-96 bg-white z-50 shadow-2xl flex flex-col transition-transform duration-300',
+//         open ? 'translate-x-0' : 'translate-x-full'
+//       )}>
+//         {/* Head */}
+//         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200">
+//           <div className="flex items-center gap-2">
+//             <ShoppingCart size={18} className="text-brand-500" />
+//             <h3 className="font-bold text-stone-800">Your Cart</h3>
+//             {itemCount() > 0 && (
+//               <span className="text-xs bg-brand-100 text-brand-600 font-bold rounded-full px-2 py-0.5">
+//                 {itemCount()} items
+//               </span>
+//             )}
+//           </div>
+//           <button onClick={onClose} className="text-stone-400 hover:text-stone-700">
+//             <X size={20} />
+//           </button>
+//         </div>
 
-        {/* Items */}
-        <div className="flex-1 overflow-y-auto p-4">
-          {itemsList().length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-stone-400 text-center">
-              <ShoppingCart size={48} className="mb-3 opacity-30" />
-              <p className="font-medium">Your cart is empty</p>
-              <p className="text-sm mt-1">Add items from the shop</p>
-              <button onClick={onClose} className="mt-4 text-brand-500 text-sm font-semibold hover:underline">
-                Browse products →
-              </button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {itemsList().map(({ product, qty }) => (
-                <div key={product.id} className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-100">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-lg bg-brand-50 flex items-center justify-center text-2xl flex-shrink-0">
-                      {product.categoryIcon}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-stone-800 truncate">{product.name}</p>
-                    <p className="text-xs text-stone-400">₹{product.pricePerKg}/kg</p>
-                    <div className="flex items-center gap-1 mt-1.5">
-                      <button onClick={() => changeQty(product.id, -(product.orderStep || 0.5))}
-                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
-                        <Minus size={11} />
-                      </button>
-                      <span className="w-10 text-center text-xs font-bold font-mono">{qty}kg</span>
-                      <button onClick={() => changeQty(product.id, product.orderStep || 0.5)}
-                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
-                        <Plus size={11} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-sm font-bold text-stone-800">₹{(product.pricePerKg * qty).toFixed(0)}</p>
-                    <button onClick={() => removeItem(product.id)} className="text-stone-300 hover:text-red-400 mt-1">
-                      <X size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+//         {/* Items */}
+//         <div className="flex-1 overflow-y-auto p-4">
+//           {itemsList().length === 0 ? (
+//             <div className="flex flex-col items-center justify-center h-full text-stone-400 text-center">
+//               <ShoppingCart size={48} className="mb-3 opacity-30" />
+//               <p className="font-medium">Your cart is empty</p>
+//               <p className="text-sm mt-1">Add items from the shop</p>
+//               <button onClick={onClose} className="mt-4 text-brand-500 text-sm font-semibold hover:underline">
+//                 Browse products →
+//               </button>
+//             </div>
+//           ) : (
+//             <div className="space-y-3">
+//               {itemsList().map(({ product, qty }) => (
+//                 <div key={product.id} className="flex items-center gap-3 p-3 rounded-xl bg-stone-50 border border-stone-100">
+//                   {product.imageUrl ? (
+//                     <img src={product.imageUrl} alt={product.name} className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+//                   ) : (
+//                     <div className="w-14 h-14 rounded-lg bg-brand-50 flex items-center justify-center text-2xl flex-shrink-0">
+//                       {product.categoryIcon}
+//                     </div>
+//                   )}
+//                   <div className="flex-1 min-w-0">
+//                     <p className="text-sm font-semibold text-stone-800 truncate">{product.name}</p>
+//                     <p className="text-xs text-stone-400">₹{product.pricePerKg}/kg</p>
+//                     <div className="flex items-center gap-1 mt-1.5">
+//                       <button onClick={() => changeQty(product.id, -(product.orderStep || 0.5))}
+//                         className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
+//                         <Minus size={11} />
+//                       </button>
+//                       <span className="w-10 text-center text-xs font-bold font-mono">{qty}kg</span>
+//                       <button onClick={() => changeQty(product.id, product.orderStep || 0.5)}
+//                         className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center hover:bg-stone-100">
+//                         <Plus size={11} />
+//                       </button>
+//                     </div>
+//                   </div>
+//                   <div className="text-right flex-shrink-0">
+//                     <p className="text-sm font-bold text-stone-800">₹{(product.pricePerKg * qty).toFixed(0)}</p>
+//                     <button onClick={() => removeItem(product.id)} className="text-stone-300 hover:text-red-400 mt-1">
+//                       <X size={13} />
+//                     </button>
+//                   </div>
+//                 </div>
+//               ))}
+//             </div>
+//           )}
+//         </div>
 
-        {/* Footer */}
-        {itemsList().length > 0 && (
-          <div className="border-t border-stone-200 p-4 space-y-3">
-            <div className="flex justify-between text-sm text-stone-600">
-              <span>Subtotal</span><span>₹{total().toFixed(0)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-base">
-              <span>Total</span>
-              <span className="text-brand-500">₹{total().toFixed(0)}</span>
-            </div>
-            <button onClick={onCheckout}
-              className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 font-bold text-sm shadow-brand transition flex items-center justify-center gap-2">
-              Proceed to Checkout <ArrowRight size={15} />
-            </button>
-          </div>
-        )}
-      </div>
-    </>
-  );
-}
+//         {/* Footer */}
+//         {itemsList().length > 0 && (
+//           <div className="border-t border-stone-200 p-4 space-y-3">
+//             <div className="flex justify-between text-sm text-stone-600">
+//               <span>Subtotal</span><span>₹{total().toFixed(0)}</span>
+//             </div>
+//             <div className="flex justify-between font-bold text-base">
+//               <span>Total</span>
+//               <span className="text-brand-500">₹{total().toFixed(0)}</span>
+//             </div>
+//             <button onClick={onCheckout}
+//               className="w-full bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 font-bold text-sm shadow-brand transition flex items-center justify-center gap-2">
+//               Proceed to Checkout <ArrowRight size={15} />
+//             </button>
+//           </div>
+//         )}
+//       </div>
+//     </>
+//   );
+// }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // CHECKOUT MODAL (3 steps)
 // ═══════════════════════════════════════════════════════════════════════════════
 function CheckoutModal({ open, onClose, onSuccess }) {
-  const [step, setStep]         = useState(1);
-  const [payMethod, setPayMethod] = useState('CASH');
-  const [placing, setPlacing]   = useState(false);
-  const [form, setForm]         = useState({ name: '', mobile: '', email: '', notes: '' });
-  const [errors, setErrors]     = useState({});
-  const { itemsList, total, toOrderPayload, clearCart } = useCartStore();
+  const [step, setStep]       = useState(1);
+  const [placing, setPlacing] = useState(false);
+  const [form, setForm]       = useState({ name: '', mobile: '', email: '', notes: '' });
+  const [errors, setErrors]   = useState({});
+  const { itemsList, total, clearCart } = useCartStore();
   const { user } = useAuthStore();
+  const { pay } = useRazorpay();
 
   useEffect(() => {
     if (user) setForm(f => ({ ...f, name: user.name || '', mobile: user.mobile || '' }));
   }, [user]);
 
   useEffect(() => {
-    if (open) { setStep(1); setErrors({}); setPayMethod('CASH'); }
+    if (open) { setStep(1); setErrors({}); }
   }, [open]);
 
   if (!open) return null;
 
   const validate = () => {
     const e = {};
-    if (!form.name.trim())                     e.name   = 'Name is required';
-    if (!/^\d{10}$/.test(form.mobile.trim()))  e.mobile = 'Enter valid 10-digit mobile';
+    if (!form.name.trim())                    e.name   = 'Name is required';
+    if (!/^\d{10}$/.test(form.mobile.trim())) e.mobile = 'Enter valid 10-digit mobile';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -688,30 +1039,40 @@ function CheckoutModal({ open, onClose, onSuccess }) {
 
   const handlePlace = async () => {
     setPlacing(true);
-    try {
-      const order = await ordersApi.place(toOrderPayload({ ...form, paymentMethod: payMethod }));
-      clearCart();
-      onClose();
-      onSuccess(order);
-    } catch (e) {
-      toast.error(e.response?.data?.message || 'Order failed. Please try again.');
-    } finally {
-      setPlacing(false);
-    }
+    onClose();
+
+    await pay({
+      cartItems: itemsList(),
+      customerDetails: form,
+      onSuccess: (result) => {
+        clearCart();
+        onSuccess({
+          orderNumber:    result.orderNumber,
+          total:          result.total,
+          customerName:   form.name,
+          customerMobile: form.mobile,
+          paymentMethod:  'UPI',
+          items: itemsList().map(({ product, qty }) => ({
+            productName: product.name,
+            qty,
+            total:      product.pricePerKg * qty,
+            unitPrice:  product.pricePerKg,
+          })),
+        });
+      },
+    });
+
+    setPlacing(false);
   };
 
-  const STEPS = ['Your Details', 'Review Order', 'Payment'];
-  const PAY   = [
-    { value: 'CASH', label: '💵 Cash',  desc: 'Pay at counter'   },
-    { value: 'UPI',  label: '📱 UPI',   desc: 'GPay / PhonePe'   },
-    { value: 'CARD', label: '💳 Card',  desc: 'Debit / Credit'   },
-  ];
+  const STEPS = ['Your Details', 'Review Order', 'Pay'];
 
   return (
     <div className="fixed inset-0 bg-black/55 z-[60] flex items-start justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-md my-8 shadow-2xl overflow-hidden"
         style={{ animation: 'modalFade 0.3s ease both' }}>
 
+        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-stone-200 bg-stone-50">
           <h3 className="text-base font-bold text-stone-800">Checkout</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-700"><X size={20} /></button>
@@ -739,7 +1100,8 @@ function CheckoutModal({ open, onClose, onSuccess }) {
                 )}>
                   {done ? '✓' : n}
                 </div>
-                <p className={clsx('text-[10px] mt-1 font-medium', active ? 'text-brand-500' : 'text-stone-400')}>
+                <p className={clsx('text-[10px] mt-1 font-medium',
+                  active ? 'text-brand-500' : 'text-stone-400')}>
                   {label}
                 </p>
               </div>
@@ -748,13 +1110,15 @@ function CheckoutModal({ open, onClose, onSuccess }) {
         </div>
 
         <div className="p-5">
-          {/* Step 1 */}
+
+          {/* ── Step 1: Details ── */}
           {step === 1 && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-semibold text-stone-500 mb-1.5">Full Name *</label>
-                  <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+                  <input value={form.name}
+                    onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                     placeholder="Your name"
                     className={clsx('w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 transition',
                       errors.name ? 'border-red-400' : 'border-stone-200 focus:border-brand-400')} />
@@ -763,7 +1127,7 @@ function CheckoutModal({ open, onClose, onSuccess }) {
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-xs font-semibold text-stone-500 mb-1.5">Mobile *</label>
                   <input value={form.mobile}
-                    onChange={e => setForm(f => ({ ...f, mobile: e.target.value.replace(/\D/g,'').slice(0,10) }))}
+                    onChange={e => setForm(f => ({ ...f, mobile: e.target.value.replace(/\D/,'').slice(0,10) }))}
                     placeholder="10-digit mobile" type="tel" maxLength={10}
                     className={clsx('w-full border rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-100 transition',
                       errors.mobile ? 'border-red-400' : 'border-stone-200 focus:border-brand-400')} />
@@ -771,13 +1135,15 @@ function CheckoutModal({ open, onClose, onSuccess }) {
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-semibold text-stone-500 mb-1.5">Email (optional)</label>
-                  <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                  <input value={form.email}
+                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                     placeholder="For receipt via email" type="email"
                     className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition" />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-xs font-semibold text-stone-500 mb-1.5">Special Instructions (optional)</label>
-                  <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+                  <textarea value={form.notes}
+                    onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
                     placeholder="e.g. Clean and cut the fish" rows={2}
                     className="w-full border border-stone-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 transition resize-none" />
                 </div>
@@ -785,7 +1151,7 @@ function CheckoutModal({ open, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Step 2 */}
+          {/* ── Step 2: Review ── */}
           {step === 2 && (
             <div className="space-y-4">
               <div className="bg-stone-50 rounded-xl p-3">
@@ -796,15 +1162,18 @@ function CheckoutModal({ open, onClose, onSuccess }) {
               <div className="space-y-2">
                 <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Your Items</p>
                 {itemsList().map(({ product, qty }) => (
-                  <div key={product.id} className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
+                  <div key={product.id}
+                    className="flex items-center justify-between py-2 border-b border-stone-100 last:border-0">
                     <div className="flex items-center gap-2">
                       <span className="text-lg">{product.categoryIcon || '🥩'}</span>
                       <div>
                         <p className="text-sm font-medium text-stone-800">{product.name}</p>
-                        <p className="text-xs text-stone-400">{qty} kg × ₹{product.pricePerKg}/kg</p>
+                        <p className="text-xs text-stone-400">{qty}kg × ₹{product.pricePerKg}/kg</p>
                       </div>
                     </div>
-                    <p className="text-sm font-bold text-stone-800">₹{(product.pricePerKg * qty).toFixed(0)}</p>
+                    <p className="text-sm font-bold text-stone-800">
+                      ₹{(product.pricePerKg * qty).toFixed(0)}
+                    </p>
                   </div>
                 ))}
               </div>
@@ -822,33 +1191,56 @@ function CheckoutModal({ open, onClose, onSuccess }) {
             </div>
           )}
 
-          {/* Step 3 */}
+          {/* ── Step 3: Pay — confirmation before Razorpay opens ── */}
           {step === 3 && (
             <div className="space-y-4">
-              <p className="text-xs font-bold text-stone-500 uppercase tracking-wide">Choose Payment Method</p>
-              <div className="space-y-2">
-                {PAY.map(opt => (
-                  <button key={opt.value} onClick={() => setPayMethod(opt.value)}
-                    className={clsx('w-full flex items-center gap-3 p-4 rounded-xl border-2 text-left transition',
-                      payMethod === opt.value ? 'border-brand-500 bg-brand-50' : 'border-stone-200 hover:border-stone-300 bg-white')}>
-                    <span className="text-2xl">{opt.label.split(' ')[0]}</span>
-                    <div className="flex-1">
-                      <p className={clsx('text-sm font-bold', payMethod === opt.value ? 'text-brand-600' : 'text-stone-700')}>
-                        {opt.label.split(' ').slice(1).join(' ')}
-                      </p>
-                      <p className="text-xs text-stone-400">{opt.desc}</p>
-                    </div>
-                    <div className={clsx('w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                      payMethod === opt.value ? 'border-brand-500 bg-brand-500' : 'border-stone-300')}>
-                      {payMethod === opt.value && <div className="w-2 h-2 rounded-full bg-white" />}
-                    </div>
-                  </button>
+
+              {/* Amount box */}
+              <div className="bg-brand-50 border border-brand-200 rounded-2xl p-5 text-center">
+                <p className="text-xs font-semibold text-brand-400 uppercase tracking-widest mb-1">
+                  Amount to Pay
+                </p>
+                <p className="text-4xl font-bold text-brand-600 font-mono">
+                  ₹{total().toFixed(0)}
+                </p>
+                <p className="text-xs text-stone-400 mt-1">
+                  {itemsList().length} item{itemsList().length > 1 ? 's' : ''} · Verified at checkout
+                </p>
+              </div>
+
+              {/* UPI badge */}
+              <div className="flex items-center gap-3 bg-white border-2 border-brand-400 rounded-xl px-4 py-3">
+                <span className="text-2xl">📱</span>
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-brand-600">Pay via UPI</p>
+                  <p className="text-xs text-stone-400">GPay · PhonePe · Paytm · Any UPI app</p>
+                </div>
+                <div className="w-5 h-5 rounded-full bg-brand-500 border-2 border-brand-500 flex items-center justify-center">
+                  <div className="w-2 h-2 rounded-full bg-white" />
+                </div>
+              </div>
+
+              {/* Secure note */}
+              <div className="flex items-center justify-center gap-2 text-xs text-stone-400">
+                <span>🔒</span>
+                <span>Secured by Razorpay · 100% safe checkout</span>
+              </div>
+
+              {/* Order summary mini */}
+              <div className="bg-stone-50 rounded-xl p-3 space-y-1">
+                <p className="text-xs font-bold text-stone-400 uppercase mb-2">Order Summary</p>
+                {itemsList().map(({ product, qty }) => (
+                  <div key={product.id} className="flex justify-between text-xs text-stone-600">
+                    <span>{product.name} × {qty}kg</span>
+                    <span className="font-semibold">₹{(product.pricePerKg * qty).toFixed(0)}</span>
+                  </div>
                 ))}
+                <div className="flex justify-between text-xs font-bold text-stone-800 pt-2 border-t border-stone-200 mt-2">
+                  <span>Total</span>
+                  <span className="text-brand-500">₹{total().toFixed(0)}</span>
+                </div>
               </div>
-              <div className="bg-stone-50 rounded-xl p-4 flex justify-between items-center">
-                <span className="text-sm font-semibold text-stone-600">Amount to pay</span>
-                <span className="text-2xl font-bold text-brand-500">₹{total().toFixed(0)}</span>
-              </div>
+
             </div>
           )}
         </div>
@@ -870,11 +1262,12 @@ function CheckoutModal({ open, onClose, onSuccess }) {
             <button onClick={handlePlace} disabled={placing}
               className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition flex items-center justify-center gap-2 shadow-brand disabled:opacity-60">
               {placing
-                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Placing…</>
-                : '✓ Place Order'}
+                ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Opening Razorpay…</>
+                : <> 📱 Pay ₹{total().toFixed(0)} Now</>}
             </button>
           )}
         </div>
+
       </div>
     </div>
   );
@@ -883,7 +1276,7 @@ function CheckoutModal({ open, onClose, onSuccess }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 // RECEIPT MODAL
 // ═══════════════════════════════════════════════════════════════════════════════
-function ReceiptModal({ order, open, onClose, onRate }) {
+function ReceiptModal({ order, open, onClose, onRate, settings }) {
   if (!open || !order) return null;
   return (
     <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 overflow-y-auto">
@@ -892,7 +1285,7 @@ function ReceiptModal({ order, open, onClose, onRate }) {
         <div className="bg-gradient-to-br from-brand-500 to-brand-400 px-6 pt-8 pb-6 text-white text-center">
           <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3 text-2xl">✓</div>
           <h2 className="font-display text-2xl font-bold mb-1">Order Confirmed!</h2>
-          <p className="text-sm opacity-80">Smart Meat Shop</p>
+          <p className="text-sm opacity-80">{settings?.shopName}</p>
           <div className="mt-3 bg-white/20 rounded-xl px-4 py-2 inline-block font-mono font-bold tracking-wide">
             {order.orderNumber}
           </div>
@@ -907,7 +1300,9 @@ function ReceiptModal({ order, open, onClose, onRate }) {
           </div>
           <div className="space-y-1.5 mb-4">
             {(order.items || []).map((item, i) => (
+             
               <div key={i} className="flex justify-between text-sm">
+                { console.log('Order items:', order?.items)}
                 <span className="text-stone-600">{item.productName} × {item.qty}kg</span>
                 <span className="font-semibold text-stone-800">₹{Number(item.total).toLocaleString('en-IN')}</span>
               </div>
@@ -922,10 +1317,10 @@ function ReceiptModal({ order, open, onClose, onRate }) {
             <span>{order.paymentMethod}</span>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => window.print()}
-              className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 transition">
-              🖨 Print
-            </button>
+           <button onClick={() => printThermalReceipt(order)}
+  className="flex-1 border border-stone-200 rounded-xl py-2.5 text-sm font-medium text-stone-600 hover:bg-stone-50 transition">
+  🖨 Print
+</button>
             <button onClick={() => { onClose(); setTimeout(onRate, 400); }}
               className="flex-1 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-2.5 text-sm font-bold transition">
               Done ✓
@@ -1069,6 +1464,125 @@ function RatingModal({ open, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// Print RECEIPT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// function printThermalReceipt(order) {
+//   const win = window.open('', '_blank', 'width=320,height=600');
+//   win.document.write(`
+//     <!DOCTYPE html><html><head>
+//     <title>Receipt - ${order.orderNumber}</title>
+//     <style>
+//       * { margin: 0; padding: 0; box-sizing: border-box; }
+//       body { font-family: monospace; font-size: 11px; width: 80mm; color: #000; padding: 4mm; }
+//       .center { text-align: center; }
+//       .bold { font-weight: bold; }
+//       .row { display: flex; justify-content: space-between; align-items: flex-start; margin: 3px 0; }
+//       hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+//       .tag { border: 1px solid #000; padding: 1px 6px; font-size: 10px; display: inline-block; margin-top: 4px; }
+//       .col-name { flex: 1; }
+//       .col-rate { margin: 0 8px; white-space: nowrap; font-size: 10px; }
+//       .col-amt  { white-space: nowrap; }
+//       @media print { @page { size: 80mm auto; margin: 0; } }
+//     </style></head><body>
+
+//     <div class="center bold" style="font-size:14px;letter-spacing:1px;">RS ROYAL MEAT MART</div>
+//     <div class="center">Bagayath, Uppal, Hyderabad</div>
+//     <div class="center">Ph: 9000474104</div>
+//     <div class="center">rsroyalmeat@gmail.com</div>
+//     <hr>
+
+//     <div class="row"><span>Order #</span><span class="bold">${order.orderNumber}</span></div>
+//     <div class="row"><span>Date</span><span>${new Date().toLocaleString('en-IN', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' })}</span></div>
+//     <div class="row"><span>Customer</span><span>${order.customerName}</span></div>
+//     <div class="row"><span>Mobile</span><span>${order.customerMobile}</span></div>
+//     <div class="row"><span>Payment</span><span>${order.paymentMethod}</span></div>
+//     <hr>
+
+//     <div class="row bold" style="font-size:10px;color:#555;">
+//       <span class="col-name">ITEM</span>
+//       <span class="col-rate">QTY x RATE</span>
+//       <span class="col-amt">AMT</span>
+//     </div>
+//     <hr>
+
+//     ${order.items.map(i => `
+//       <div class="row">
+//         <span class="col-name">${i.productName}</span>
+//         <span class="col-rate">${i.qty}kg x ₹${i.pricePerKg}</span>
+//         <span class="col-amt">₹${i.total}</span>
+//       </div>
+//     `).join('')}
+//     <hr>
+
+//     <div class="row"><span>Subtotal</span><span>₹${order.items.reduce((s,i)=>s+i.total,0)}</span></div>
+//     <div class="row bold" style="font-size:13px;"><span>TOTAL</span><span>₹${order.total}</span></div>
+//     <hr>
+
+//     <div class="center">Collect at <b>Dispatch Counter</b></div>
+//     <div class="center">Ready in 20–30 minutes</div>
+//     <div class="center"><span class="tag">PICKUP ORDER</span></div>
+//     <hr>
+
+//     <div class="center">Thank you for your order!</div>
+//     <div class="center">Fresh · Quality · Daily</div>
+//     <div class="center" style="font-size:10px;margin-top:4px;">Powered by Keerthu's Soft Solution</div>
+
+//     </body></html>
+//   `);
+//   win.document.close();
+//   win.focus();
+//   setTimeout(() => { win.print(); win.close(); }, 400);
+// }
+
+function printThermalReceipt(order) {
+  const win = window.open('', '_blank', 'width=320,height=600');
+  win.document.write(`
+    <!DOCTYPE html><html><head>
+    <title>Receipt - ${order.orderNumber}</title>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      body { font-family: monospace; font-size: 11px; width: 80mm; color: #000; padding: 4mm; }
+      .center { text-align: center; }
+      .bold { font-weight: bold; }
+      .row { display: flex; justify-content: space-between; margin: 2px 0; }
+      hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
+      .tag { border: 1px solid #000; padding: 1px 6px; font-size: 10px; display: inline-block; }
+      @media print { @page { size: 80mm auto; margin: 0; } }
+    </style></head><body>
+    <div class="center bold" style="font-size:14px;">RS ROYAL MEAT MART</div>
+    <div class="center">Bagayath, Uppal, Hyderabad</div>
+    <div class="center">Ph: 9000474104</div>
+    <hr>
+    <div class="row"><span>Order #</span><span class="bold">${order.orderNumber}</span></div>
+    <div class="row"><span>Date</span><span>${new Date().toLocaleString('en-IN')}</span></div>
+    <div class="row"><span>Customer</span><span>${order.customerName}</span></div>
+    <div class="row"><span>Mobile</span><span>${order.customerMobile}</span></div>
+    <div class="row"><span>Payment</span><span>${order.paymentMethod}</span></div>
+    <hr>
+    <div class="row bold"><span>ITEM</span><span>QTY</span><span>AMT</span></div>
+    <hr>
+    ${order.items.map(i => `
+      <div class="row"><span>${i.productName}</span><span>${i.qty}kg</span><span>₹${i.total}</span></div>
+      <div style="color:#555;font-size:10px;margin-bottom:2px;">@ ₹${i.unitPrice}/kg</div>
+    `).join('')}
+    <hr>
+    <div class="row bold"><span>TOTAL</span><span>₹${order.total}</span></div>
+    <hr>
+    <div class="center">Collect at <b>Dispatch Counter</b></div>
+    <div class="center">Ready in 20–30 minutes</div>
+    <div class="center"><span class="tag">PICKUP ORDER</span></div>
+    <hr>
+    <div class="center">Thank you! Fresh · Quality · Daily</div>
+    <div class="center" style="font-size:10px;margin-top:4px;">Powered by Keerthu's Soft Solution</div>
+    </body></html>
+  `);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); win.close(); }, 400);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function HomePage() {
@@ -1097,7 +1611,7 @@ export default function HomePage() {
       {!loaded && <SiteLoader onDone={() => setLoaded(true)} />}
 
       <div style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.5s ease' }}>
-        <Navbar cartCount={itemCount()} onOpenCart={() => setCartOpen(true)} />
+        <Navbar cartCount={itemCount()} onOpenCart={() => setCartOpen(true)}  settings={shopSettings} />
 
         <Hero settings={shopSettings} products={products} />
 
@@ -1153,6 +1667,7 @@ export default function HomePage() {
         <ReceiptModal
           open={receiptOpen}
           order={receiptOrder}
+          settings={shopSettings}
           onClose={() => setReceiptOpen(false)}
           onRate={() => setRatingOpen(true)}
         />

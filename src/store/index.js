@@ -37,7 +37,10 @@ export const useCartStore = create(
       addItem: (product) => {
         const items = { ...get().items };
         if (items[product.id]) {
-          items[product.id] = { ...items[product.id], qty: items[product.id].qty + (product.orderStep || 0.5) };
+          items[product.id] = {
+            ...items[product.id],
+            qty: parseFloat((items[product.id].qty + (product.orderStep || 0.5)).toFixed(2)),
+          };
         } else {
           items[product.id] = { product, qty: product.minOrderQty || 0.5 };
         }
@@ -53,8 +56,7 @@ export const useCartStore = create(
       changeQty: (productId, delta) => {
         const items = { ...get().items };
         if (!items[productId]) return;
-        const step = items[productId].product.orderStep || 0.5;
-        const newQty = Math.round((items[productId].qty + delta) * 10) / 10;
+        const newQty = parseFloat((items[productId].qty + delta).toFixed(2));
         if (newQty <= 0) {
           delete items[productId];
         } else {
@@ -63,12 +65,28 @@ export const useCartStore = create(
         set({ items });
       },
 
+      // ✅ NEW — set qty directly (used by manual input)
+      setQty: (productId, qty) => {
+        const items = { ...get().items };
+        if (!items[productId]) return;
+        const finalQty = parseFloat(qty.toFixed(2));
+        if (finalQty <= 0) {
+          delete items[productId];
+        } else {
+          items[productId] = { ...items[productId], qty: finalQty };
+        }
+        set({ items });
+      },
+
       clearCart: () => set({ items: {} }),
 
       itemCount: () => Object.keys(get().items).length,
 
-      total: () => Object.values(get().items)
-        .reduce((sum, { product, qty }) => sum + product.pricePerKg * qty, 0),
+      total: () =>
+        Object.values(get().items).reduce(
+          (sum, { product, qty }) => sum + product.pricePerKg * qty,
+          0
+        ),
 
       itemsList: () => Object.values(get().items),
 
