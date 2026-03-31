@@ -280,14 +280,14 @@ function ReceiptModal({ order, khataInfo, onClose }) {
             {order.items?.map((item, i) => (
               <div key={i} className="flex justify-between text-sm">
                 <span className="text-stone-600">{item.productName} × {item.qty}kg</span>
-                <span className="font-semibold">₹{Number(item.total).toLocaleString('en-IN')}</span>
+                <span className="font-semibold">₹{Number(Math.round(item.total)).toLocaleString('en-IN')}</span>
               </div>
             ))}
           </div>
           <div className="border-t border-stone-200 pt-3 flex justify-between">
             <span className="font-bold text-stone-800">Bill Total</span>
             <span className="font-bold text-brand-500 text-lg">
-              ₹{Number(order.total).toLocaleString('en-IN')}
+              ₹{Number(Math.round(order.total)).toLocaleString('en-IN')}
             </span>
           </div>
           {khataInfo && (
@@ -485,18 +485,20 @@ export default function AdminNewSale() {
   //   CASH only         → no Razorpay  (upiAmount = 0)
   //   UPI / CARD        → Razorpay for full amount (or partial amount in khata mode)
   //   SPLIT w/ upi > 0  → Razorpay only for the UPI portion
-  const razorpayAmount = (() => {
-    if (payState.mode === 'UPI' || payState.mode === 'CARD') {
-      // In khata mode the admin might enter a partial cashAmt (which is the UPI amount here)
-      return useKhata
-        ? (parseFloat(payState.cashAmt) || 0)   // "cashAmt" field doubles as "paying now" in khata single-method
-        : grandTotal;
-    }
-    if (payState.mode === 'SPLIT') {
-      return parseFloat(payState.upiAmt) || 0;  // only the UPI/Card portion
-    }
-    return 0; // CASH → no Razorpay
-  })();
+
+ const razorpayAmount = (() => {
+  if (payState.mode === 'UPI' || payState.mode === 'CARD') {
+    return useKhata
+      ? (parseFloat(payState.cashAmt) || 0)  // cashAmt = UPI amount paying now in khata-UPI mode
+      : grandTotal;
+  }
+  if (payState.mode === 'SPLIT') {
+    // In khata+split: upiAmt is the Razorpay portion, rest is khata
+    // In normal split: upiAmt is the Razorpay portion
+    return parseFloat(payState.upiAmt) || 0;
+  }
+  return 0;
+})();
 
   const needsRazorpay = razorpayAmount > 0;
 
@@ -604,30 +606,41 @@ export default function AdminNewSale() {
     };
 
     try {
-      await pay({
+
+                const upiNow = (() => {
+            if (payState.mode === 'SPLIT')               return accountDelta;                   // upiAmt field
+            if (payState.mode === 'UPI' || payState.mode === 'CARD') {
+              return useKhata
+                ? (parseFloat(payState.cashAmt) || 0)    // cashAmt = "paying now" in khata-UPI
+                : grandTotal;
+            }
+            return 0;
+          })();
+
+
+          const cashNow = (() => {
+            if (payState.mode === 'SPLIT') return cashDelta;                                    // cashAmt field
+            return 0;
+          })();
+
+
+            await pay({
         cartItems:      cartItemsForRazorpay,
         customerDetails,
-        overrideAmount: razorpayAmount,   // ← exact UPI portion in ₹
-
-        cashPaid:  payState.mode === 'SPLIT' ? cashDelta      : 0,
-        upiPaid:   payState.mode === 'SPLIT' ? accountDelta   : razorpayAmount,
-         role:           'ADMIN',
-         paymentMode:    payState.mode,
-         isKhata:        useKhata,
-        onSuccess: (razorpayResult) => {
-          finalizeSale(razorpayResult);
-        },
-
-        onFailure: (err) => {
-          toast.error('Payment cancelled or failed. Sale not recorded.');
-          console.error('Razorpay failure:', err);
-        },
+        overrideAmount: razorpayAmount,   // exact amount Razorpay charges
+        cashPaid:       cashNow,
+        upiPaid:        upiNow,           // exact UPI portion backend stores
+        paymentMode:    payState.mode,
+        role:           'ADMIN',
+        isKhata:        useKhata,
+        onSuccess: (razorpayResult) => { finalizeSale(razorpayResult); },
+        onFailure: (err) => { toast.error('Payment cancelled or failed.'); },
       });
-    } catch (err) {
-      toast.error('Could not open payment gateway. Please try again.');
-      console.error('Razorpay error:', err);
-    }
-  };
+          } catch (err) {
+            toast.error('Could not open payment gateway. Please try again.');
+            console.error('Razorpay error:', err);
+          }
+        };
 
   const quickAdd = (product) => {
     const existing = rows.find(r => r.productId === product.id);

@@ -346,7 +346,7 @@ function ShopSection({ products, categories }) {
 
             // ✅ live cost — recalculates as cartItem.qty changes in zustand
             const liveCost = cartItem
-              ? (product.pricePerKg * cartItem.qty).toFixed(0)
+              ? Math.round(product.pricePerKg * cartItem.qty)
               : null;
 
             return (

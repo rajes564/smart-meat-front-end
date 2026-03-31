@@ -26,8 +26,8 @@ export function useRazorpay() {
         // Backend must convert to paise: Math.round(overrideAmount * 100)
      ...(overrideAmount != null && overrideAmount > 0 && { amount: overrideAmount }),
       // ── payment context ──
-      cashPaid:    cashPaid    ?? 0,
-      upiPaid:     upiPaid     ?? 0,
+      cashPaid:    Math.round(cashPaid)    ?? 0,
+      upiPaid:    Math.round( upiPaid )    ?? 0,
       paymentMode: paymentMode ?? 'UPI',
       role:        role        ?? 'CUSTOMER',
       isKhata: isKhata
@@ -51,40 +51,37 @@ export function useRazorpay() {
 
         theme: { color: '#e05c2a' },
 
-        handler: async (response) => {
-          // 3. Verify payment on backend
-          try {
-
-            
-            const result = await paymentApi.verifyPayment({
-              razorpayOrderId:   response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              customerName:      customerDetails.name,
-              customerMobile:    customerDetails.mobile,
-              customerEmail:     customerDetails.email,
-              notes:             customerDetails.notes,
-              items: cartItems.map(({ product, qty }) => ({
-                productId: product.id,
-                qty,
-              })),
-              // Forward so backend can cross-check verified amount
-               ...(overrideAmount != null && overrideAmount > 0 && { amount: overrideAmount }),
-        // ── payment split amounts ──
-               cashPaid:  cashPaid  ?? 0,
-               upiPaid:   upiPaid   ?? 0,
+          handler: async (response) => {
+            try {
+              const result = await paymentApi.verifyPayment({
+                razorpayOrderId:   response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                customerName:      customerDetails.name,
+                customerMobile:    customerDetails.mobile,
+                customerEmail:     customerDetails.email,
+                notes:             customerDetails.notes,
+                items: cartItems.map(({ product, qty }) => ({
+                  productId: product.id,
+                  qty,
+                })),
+                ...(overrideAmount != null && overrideAmount > 0 && { amount: overrideAmount }),
+                cashPaid:    cashPaid    ?? 0,
+                upiPaid:     upiPaid     ?? 0,
                 paymentMode: paymentMode ?? 'UPI',
-                role:role ?? 'CUSTOMER',
-            });
+                role:        role        ?? 'CUSTOMER',
+                isKhata:     isKhata     ?? false,
+              });
 
-            toast.success('Payment successful!');
-            onSuccess(result);
+              // result = { verified: true, razorpayPaymentId: "pay_xxx" }
+              toast.success('Payment verified!');
+              onSuccess(result);   // → finalizeSale(result) → pos-sale saves ONCE
 
-          } catch (err) {
-            toast.error('Payment verification failed. Contact support.');
-            onFailure?.(err);
-          }
-        },
+            } catch (err) {
+              toast.error('Payment verification failed. Contact support.');
+              onFailure?.(err);
+            }
+          },
 
         modal: {
           ondismiss: () => {
