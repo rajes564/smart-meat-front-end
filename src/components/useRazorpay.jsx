@@ -30,6 +30,7 @@ export function useRazorpay() {
       upiPaid:     upiPaid     ?? 0,
       paymentMode: paymentMode ?? 'UPI',
       role:        role        ?? 'CUSTOMER',
+      isKhata: isKhata
       });
 
       // 2. Open Razorpay checkout
