@@ -1621,37 +1621,79 @@ export default function HomePage() {
 
         <ContactSection settings={shopSettings} />
 
-        {/* Footer */}
-        <footer className="bg-stone-900 text-white/60 py-10 px-4">
-          <div className="max-w-6xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
-            <div>
-              <p className="font-display text-lg font-bold text-white mb-2">🥩 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}</p>
-              <p className="text-sm leading-relaxed">
-                Fresh fish, chicken &amp; mutton sourced daily. Quality you can taste.
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Contact</p>
-              <p className="text-sm flex items-center gap-1.5 mb-1">
-                <Phone size={12} /> {shopSettings?.phone || '9000474104'}
-              </p>
-              <p className="text-sm flex items-center gap-1.5">
-                <Mail size={12} /> {shopSettings?.email || 'rsroyalmeat@gmail.com'}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Hours</p>
-              <p className="text-sm">Mon–Sat: {shopSettings?.openTime || '7AM'} – {shopSettings?.closeTime || '8PM'}</p>
-              <p className="text-sm">Sunday: {shopSettings?.openTime || '7AM'} – {shopSettings?.sundayClose || '2PM'}</p>
-            </div>
-          </div>
-          <div className="max-w-6xl mx-auto border-t border-white/10 mt-8 pt-6 flex justify-between items-center text-xs">
-            <span>© 2026 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}</span>
-            <span className='flex items-center g-5'>From our shop to your plate, with <span className='text-xl text-red-500'>❤️</span></span>
-            <span className='flex items-center g-5'>Keerthu's Soft Solution ®</span>
-            {/* <Link to="/login" className="text-white/40 hover:text-white transition">Admin Login</Link> */}
-          </div>
-        </footer>
+{/* Footer */}
+<footer className="relative overflow-hidden bg-stone-900 text-white/60 pt-12 pb-6 px-4">
+
+  {/* Floating Bubbles */}
+  {[
+    { size: 80,  left: '5%',  delay: '0s',   dur: '9s',  color: '#ef4444' },
+    { size: 50,  left: '18%', delay: '2s',   dur: '13s', color: '#f97316' },
+    { size: 120, left: '40%', delay: '1s',   dur: '11s', color: '#ef4444' },
+    { size: 40,  left: '62%', delay: '3.5s', dur: '8s',  color: '#f97316' },
+    { size: 90,  left: '75%', delay: '0.5s', dur: '14s', color: '#ef4444' },
+    { size: 30,  left: '88%', delay: '4s',   dur: '10s', color: '#f97316' },
+    { size: 60,  left: '92%', delay: '1.5s', dur: '7s',  color: '#ef4444' },
+  ].map((b, i) => (
+    <span
+      key={i}
+      className="absolute bottom-0 rounded-full pointer-events-none"
+      style={{
+        width: b.size, height: b.size,
+        left: b.left,
+        background: b.color,
+        opacity: 0,
+        animation: `floatBubble ${b.dur} ${b.delay} linear infinite`,
+      }}
+    />
+  ))}
+
+  {/* Add this to your global CSS or a <style> tag */}
+  {/* @keyframes floatBubble {
+    0%   { transform: translateY(0) scale(1); opacity: 0.07; }
+    50%  { opacity: 0.13; }
+    100% { transform: translateY(-180px) scale(1.1); opacity: 0; }
+  } */}
+
+  <div className="relative z-10 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
+    <div className="border-b border-white/10 pb-5 sm:border-none sm:pb-0">
+      <p className="font-display text-lg font-bold text-white mb-2 flex items-center gap-2">
+        🥩 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}
+      </p>
+      <p className="text-sm leading-relaxed text-white/50">
+        Fresh fish, chicken &amp; mutton sourced daily. Quality you can taste.
+      </p>
+    </div>
+
+    <div className="border-b border-white/10 pb-5 sm:border-none sm:pb-0">
+      <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Contact</p>
+      <p className="text-sm flex items-center gap-1.5 mb-1">
+        <Phone size={12} /> {shopSettings?.phone || '9000474104'}
+      </p>
+      <p className="text-sm flex items-center gap-1.5">
+        <Mail size={12} /> {shopSettings?.email || 'rsroyalmeat@gmail.com'}
+      </p>
+    </div>
+
+    <div>
+      <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Hours</p>
+      <p className="text-sm flex items-center gap-1.5 mb-1">
+        <Clock size={12} /> Mon–Sat: {shopSettings?.openTime || '7AM'} – {shopSettings?.closeTime || '8PM'}
+      </p>
+      <p className="text-sm flex items-center gap-1.5">
+        <Clock size={12} /> Sunday: {shopSettings?.openTime || '7AM'} – {shopSettings?.sundayClose || '2PM'}
+      </p>
+    </div>
+  </div>
+
+  <div className="relative z-10 max-w-5xl mx-auto border-t border-white/10 mt-8 pt-5
+    flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
+    <span className="text-white/35">© 2026 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}</span>
+    <span className="flex items-center gap-1 text-white/35">
+      From our shop to your plate, with <span className="text-red-500 text-base leading-none">❤</span>
+    </span>
+    <span className="text-white/20 sm:text-start">Keerthu's Soft Solution ®</span>
+  </div>
+</footer>
 
         {/* Modals */}
         <CartDrawer
