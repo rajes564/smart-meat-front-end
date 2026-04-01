@@ -1691,7 +1691,7 @@ export default function HomePage() {
     <span className="flex items-center gap-1 text-white/35">
       From our shop to your plate, with <span className="text-red-500 text-base leading-none">❤</span>
     </span>
-    <span className="text-white/20 sm:text-start">Keerthu's Soft Solution ®</span>
+    <span className="text-white/20 sm:text-center">Keerthu's Soft Solution ®</span>
   </div>
 </footer>
 
