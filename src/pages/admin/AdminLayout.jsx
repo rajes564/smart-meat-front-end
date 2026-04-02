@@ -146,7 +146,7 @@ export default function AdminLayout() {
      *
      *  ┌─────────────────────────────────────────────────┐  ← h-screen, overflow:hidden
      *  │  <aside> fixed height, internal nav scroll      │
-     *  │  <div flex-col>                                  │
+     *  │  <div flex-col>                                 │
      *  │    <header> flex-shrink-0 (never shrinks)       │
      *  │    <main>   flex-1 overflow-y-auto  ← ONLY scroll│
      *  │  </div>                                          │
@@ -186,7 +186,7 @@ export default function AdminLayout() {
         {/* Logo */}
         <div className="p-4 border-b border-stone-200 flex items-center justify-between flex-shrink-0">
           <div>
-            <p className="font-display text-base font-bold text-stone-900">🥩 Smart Meat</p>
+            <p className="font-display text-base font-bold text-stone-900">Royal Meat Mart</p>
             <p className="text-[10px] text-stone-400">Admin Panel</p>
           </div>
           <button
