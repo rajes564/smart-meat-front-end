@@ -7,10 +7,10 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // '/api': { target: 'https://royal-meat-mark.onrender.com/', changeOrigin: true },
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
-      // '/uploads': { target: 'https://royal-meat-mark.onrender.com/', changeOrigin: true },
-      '/uploads': { target: 'http://localhost:8080', changeOrigin: true },
+      '/api': { target: 'https://royal-meat-mark.onrender.com/', changeOrigin: true },
+      // '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      '/uploads': { target: 'https://royal-meat-mark.onrender.com/', changeOrigin: true },
+      // '/uploads': { target: 'http://localhost:8080', changeOrigin: true },
     },
   },
   build: { outDir: 'dist', sourcemap: false },
