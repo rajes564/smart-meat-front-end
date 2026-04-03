@@ -175,7 +175,11 @@ function Hero({ settings, products }) {
 
   // Admin-managed carousel images from settings, fallback to defaults
   const carouselImages = settings?.heroImages?.length
-    ? settings.heroImages
+    ? settings.heroImages.map(item =>
+      typeof item === 'string'
+        ? { src: item, caption: '' }
+        : { src: item.src, caption: item.caption || '' }
+    )
     : [
         'https://images.unsplash.com/photo-1534482421-64566f976cfa?w=1600&q=80',
         'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=1600&q=80',
@@ -213,8 +217,8 @@ function Hero({ settings, products }) {
           style={{ opacity: i === slideIdx ? 1 : 0, zIndex: 0 }}
         >
           <img
-            src={img}
-            alt={`hero-${i}`}
+             src={img.src}  
+             alt={img.caption || `hero-${i}`}  
             className="w-full h-full object-cover opacity-80"
           />
         </div>
@@ -1066,13 +1070,13 @@ function CheckoutModal({ open, onClose, onSuccess }) {
 
   const handlePlace = async () => {
     setPlacing(true);
-    onClose();
+    // 
 
     await pay({
       cartItems: itemsList(),
       customerDetails: form,
       onSuccess: (result) => {
-        clearCart();
+        // clearCart();
         const orderData = {
           orderNumber:    result.orderNumber,
           total:          result.total,
@@ -1086,7 +1090,10 @@ function CheckoutModal({ open, onClose, onSuccess }) {
             unitPrice:  product.pricePerKg,
           })),
         };
+
+      
         onSuccess(orderData);
+        clearCart();
         // ── AUTO-PRINT: fire after a short delay so the receipt modal renders first
         setTimeout(() => {
           if (window.matchMedia('print').media !== 'not all' || navigator.userAgent) {
@@ -1097,6 +1104,12 @@ function CheckoutModal({ open, onClose, onSuccess }) {
     });
 
     setPlacing(false);
+    onClose();
+      setForm(prev => ({
+        ...prev,
+        name: "",
+        mobile: ""
+      }));
   };
 
   const STEPS = ['Your Details', 'Review Order', 'Pay'];
@@ -1282,6 +1295,10 @@ function CheckoutModal({ open, onClose, onSuccess }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 function ReceiptModal({ order, open, onClose, onRate, settings }) {
   if (!open || !order) return null;
+  
+  {console.log("receipt modal opened.......");
+    console.table(order);
+  }
   return (
     <div className="fixed inset-0 bg-black/60 z-[70] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl w-full max-w-sm my-8 shadow-2xl overflow-hidden"
@@ -1463,6 +1480,8 @@ function RatingModal({ open, onClose }) {
 // PRINT RECEIPT — FIXED column layout + auto-print support
 // ═══════════════════════════════════════════════════════════════════════════════
 function printThermalReceipt(order, { autoPrint = false } = {}) {
+  console.log("printing is called");
+  console.log(order)
   const win = window.open('', '_blank', 'width=340,height=650');
   if (!win) {
     // Popup blocked — notify user
@@ -1477,6 +1496,7 @@ function printThermalReceipt(order, { autoPrint = false } = {}) {
 
   // Build items rows with proper fixed-width columns
   const itemRows = (order.items || []).map(item => {
+    {console.table(item)}
     const name     = String(item.productName || '').slice(0, 18).padEnd(18, ' ');
     const qty      = String(item.qty + 'kg').padStart(5, ' ');
     const rate     = String('₹' + (item.unitPrice || '')).padStart(7, ' ');
