@@ -30,10 +30,13 @@ export function SellerLayout() {
     >
       {/* Fixed-height header */}
       <header className="flex-shrink-0 bg-white border-b border-stone-200 px-4 py-3 flex items-center justify-between shadow-sm z-40">
-        <div className="flex items-center gap-3">
-          <span className="text-xl">🥩</span>
+        <div className="flex items-center gap-3" >
+          <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center text-lg">
+          <img src="/images/meat_logo.jpg" alt="Shop Logo" className="w-full h-full object-cover rounded-xl" />
+          </div>
+         
           <div>
-            <p className="text-sm font-bold text-stone-800">Smart Meat Shop</p>
+            <p className="text-sm font-bold text-stone-800">RS ROYAL SMART MEAT</p>
             <p className="text-xs text-stone-400">Seller · {user?.name}</p>
           </div>
         </div>

@@ -5,12 +5,16 @@ import { productsApi, categoriesApi, shopApi, reviewsApi, ordersApi } from '../s
 import {
   ShoppingCart, Star, Phone, Mail, MapPin, Clock,
   X, Minus, Plus, ChevronUp, ArrowRight, LogIn,
-  ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX
+  ChevronLeft, ChevronRight, Play, Pause, Volume2, VolumeX,
+  Instagram,
+  Facebook,
+  YoutubeIcon
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
 import { Link, useNavigate } from 'react-router-dom';
 import { useRazorpay } from '../components/useRazorpay';
+import ShareSection from '../components/ShareSection';
 
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -97,7 +101,9 @@ function Navbar({ cartCount, onOpenCart, settings }) {
     return () => window.removeEventListener('scroll', fn);
   }, []);
 
-  const scrollTo = (id) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+  
+
+
 
   return (
     <nav className={clsx(
@@ -676,7 +682,7 @@ function GallerySection({ settings }) {
         { type: 'image', src: 'https://images.unsplash.com/photo-1604503468506-a8da13d82791?w=600&q=80', caption: 'Premium Chicken' },
         { type: 'image', src: 'https://images.unsplash.com/photo-1529692236671-f1f6cf9683ba?w=600&q=80', caption: 'Quality Mutton' },
         { type: 'image', src: 'https://images.unsplash.com/photo-1607623814075-e51df1bdc82f?w=600&q=80', caption: 'Our Shop' },
-        { type: 'image', src: 'https://images.unsplash.com/photo-1602491453631-e2a5ad90a131?w=600&q=80', caption: 'Fresh Catch' },
+        { type: 'image', src: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=600&q=80', caption: 'Fresh Catch' },
         { type: 'image', src: 'https://images.unsplash.com/photo-1615141982883-c7ad0e69fd62?w=600&q=80', caption: 'Daily Arrivals' },
       ];
 
@@ -722,10 +728,10 @@ function GallerySection({ settings }) {
               A glimpse inside our shop — the freshness, the quality, and the care that goes into every order.
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-stone-500 bg-stone-800 border border-stone-700 rounded-full px-4 py-2">
+          {/* <div className="flex items-center gap-2 text-xs text-stone-500 bg-stone-800 border border-stone-700 rounded-full px-4 py-2">
             <span className="w-2 h-2 bg-brand-500 rounded-full" />
             {galleryItems.length} photos &amp; videos
-          </div>
+          </div> */}
         </div>
 
         {/* Mosaic Grid */}
@@ -1708,7 +1714,7 @@ export default function HomePage() {
               style={{ width: b.size, height: b.size, left: b.left, background: b.color, opacity: 0, animation: `floatBubble ${b.dur} ${b.delay} linear infinite` }} />
           ))}
 
-          <div className="relative z-10 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-8">
+          <div className="relative z-10 max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-4 gap-8">
             <div className="border-b border-white/10 pb-5 sm:border-none sm:pb-0">
               <p className="font-display text-lg font-bold text-white mb-2 flex items-center gap-2">
                 🥩 {shopSettings?.shopName || 'RS ROYAL MEAT MART'}
@@ -1727,6 +1733,16 @@ export default function HomePage() {
               <p className="text-sm flex items-center gap-1.5 mb-1"><Clock size={12} /> Mon–Sat: {shopSettings?.openTime || '7AM'} – {shopSettings?.closeTime || '8PM'}</p>
               <p className="text-sm flex items-center gap-1.5"><Clock size={12} /> Sunday: {shopSettings?.openTime || '7AM'} – {shopSettings?.sundayClose || '2PM'}</p>
             </div>
+            <div>
+              <p className="text-xs font-bold text-white uppercase tracking-wider mb-3">Follow us on</p>
+              <div className='flex gap-3'>
+                  <Instagram size={25} className="hover:text-red-500 hover:scale-110 transition-all duration-300 cursor-pointer"/> 
+                  <Facebook size={25}  className="hover:text-blue-600 hover:scale-110 transition-all duration-300 cursor-pointer"/> 
+                  <YoutubeIcon size={25} className="hover:text-red-500 hover:scale-110 transition-all duration-300 cursor-pointer"/> 
+                  <YoutubeIcon size={25}  className="hover:text-red-500 hover:scale-110 transition-all duration-300 cursor-pointer"/> 
+              </div>
+           
+            </div>
           </div>
 
           <div className="relative z-10 max-w-5xl mx-auto border-t border-white/10 mt-8 pt-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs">
@@ -1736,6 +1752,7 @@ export default function HomePage() {
             </span>
             <span className="text-white/20 text-center">Keerthu's Soft Solution </span>
           </div>
+          <ShareSection />
         </footer>
 
         {/* Modals */}
@@ -1761,6 +1778,8 @@ export default function HomePage() {
           onRate={() => setRatingOpen(true)}
         />
         <RatingModal open={ratingOpen} onClose={() => setRatingOpen(false)} />
+
+          
 
         {scrollTopVisible && (
           <button

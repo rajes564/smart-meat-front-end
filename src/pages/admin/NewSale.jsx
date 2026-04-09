@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from 'react-query';
 import { productsApi, categoriesApi, ordersApi, khataApi } from '../../services/api';
-
 import api from '../../services/api';
 import { usePosStore } from '../../store';
 import {
   Plus, Printer, RotateCcw, ShoppingBag, Search, X,
-  BookOpen, AlertTriangle, ChevronDown, Minus
+  BookOpen, AlertTriangle, ChevronDown, Minus, ShoppingCart, ArrowLeft
 } from 'lucide-react';
 import { clsx } from 'clsx';
 import toast from 'react-hot-toast';
@@ -32,18 +31,15 @@ function computeSplit(payState, grandTotal) {
   };
 }
 
-// ── QtyInput — controlled input that allows backspace + free typing ────────────
+// ── QtyInput ──────────────────────────────────────────────────────────────────
 function QtyInput({ value, onCommit, step = 0.5, minQty = 0.5, className = '' }) {
-  const [editing, setEditing]   = useState(false);
-  const [draft,   setDraft]     = useState('');
+  const [editing, setEditing] = useState(false);
+  const [draft,   setDraft]   = useState('');
 
   const commit = (raw) => {
     const parsed = parseFloat(raw);
-    if (!isNaN(parsed) && parsed > 0) {
-      onCommit(parseFloat(parsed.toFixed(3)));
-    } else {
-      onCommit(value);
-    }
+    if (!isNaN(parsed) && parsed > 0) onCommit(parseFloat(parsed.toFixed(3)));
+    else onCommit(value);
     setEditing(false);
     setDraft('');
   };
@@ -51,10 +47,7 @@ function QtyInput({ value, onCommit, step = 0.5, minQty = 0.5, className = '' })
   if (editing) {
     return (
       <input
-        type="number"
-        min="0.001"
-        step="any"
-        autoFocus
+        type="number" min="0.001" step="any" autoFocus
         value={draft}
         onChange={e => setDraft(e.target.value)}
         onBlur={() => commit(draft)}
@@ -102,11 +95,9 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
       <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">
         {khataMode ? 'Payment Method (for amount paying now)' : 'Payment Method'}
       </p>
-
       <div className="grid grid-cols-4 gap-1.5">
         {methods.map(m => (
-          <button
-            key={m.key}
+          <button key={m.key}
             onClick={() => onChange({ ...value, mode: m.key, cashAmt: '', upiAmt: '' })}
             className={clsx(
               'flex flex-col items-center gap-0.5 py-2.5 rounded-xl border text-[11px] font-semibold transition',
@@ -126,7 +117,6 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
         </p>
       )}
 
-      {/* ── UPI badge — Razorpay will be triggered ── */}
       {(value.mode === 'UPI' || value.mode === 'CARD') && (
         <div className="flex items-center gap-2 bg-brand-50 border border-brand-200 rounded-xl px-3 py-2">
           <span className="text-base">📱</span>
@@ -138,7 +128,6 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
         </div>
       )}
 
-      {/* ── SPLIT inputs (normal mode) ── */}
       {value.mode === 'SPLIT' && !khataMode && (
         <div className="space-y-2 bg-stone-50 rounded-xl p-3 border border-stone-200">
           <p className="text-[10px] font-semibold text-stone-500">
@@ -147,36 +136,27 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-stone-400 mb-1 block">💵 Cash (₹)</label>
-              <input
-                type="number" min="0" step="1" placeholder="0"
+              <input type="number" min="0" step="1" placeholder="0"
                 value={value.cashAmt}
                 onChange={e => onChange({ ...value, cashAmt: e.target.value })}
-                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400"
-              />
+                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400" />
             </div>
             <div>
               <label className="text-[10px] text-stone-400 mb-1 block">📱 UPI/Card (₹)</label>
-              <input
-                type="number" min="0" step="1" placeholder="0"
+              <input type="number" min="0" step="1" placeholder="0"
                 value={value.upiAmt}
                 onChange={e => onChange({ ...value, upiAmt: e.target.value })}
-                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400"
-              />
+                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400" />
             </div>
           </div>
           {splitSum > 0 && (
             <div className="flex justify-between text-[10px] font-semibold pt-1 border-t border-stone-200">
               <span className="text-stone-500">Split total</span>
-              <span className={clsx(
-                'font-mono',
-                Math.abs(splitSum - total) < 0.01 ? 'text-green-600' : 'text-amber-600'
-              )}>
-                ₹{splitSum.toFixed(0)}
-                {Math.abs(splitSum - total) < 0.01 ? ' ✓' : ` (need ₹${total.toFixed(0)})`}
+              <span className={clsx('font-mono', Math.abs(splitSum - total) < 0.01 ? 'text-green-600' : 'text-amber-600')}>
+                ₹{splitSum.toFixed(0)}{Math.abs(splitSum - total) < 0.01 ? ' ✓' : ` (need ₹${total.toFixed(0)})`}
               </span>
             </div>
           )}
-          {/* Razorpay hint when UPI amount > 0 in split */}
           {upiVal > 0 && (
             <div className="flex items-center gap-1.5 bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5">
               <span className="text-sm">📱</span>
@@ -188,7 +168,6 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
         </div>
       )}
 
-      {/* ── SPLIT inputs (khata mode) ── */}
       {value.mode === 'SPLIT' && khataMode && (
         <div className="space-y-2 bg-amber-light/40 rounded-xl p-3 border border-amber-200">
           <p className="text-[10px] font-semibold text-amber-shop">
@@ -197,21 +176,17 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="text-[10px] text-stone-400 mb-1 block">💵 Cash (₹)</label>
-              <input
-                type="number" min="0" step="1" placeholder="0"
+              <input type="number" min="0" step="1" placeholder="0"
                 value={value.cashAmt}
                 onChange={e => onChange({ ...value, cashAmt: e.target.value })}
-                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400"
-              />
+                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400" />
             </div>
             <div>
               <label className="text-[10px] text-stone-400 mb-1 block">📱 UPI/Card (₹)</label>
-              <input
-                type="number" min="0" step="1" placeholder="0"
+              <input type="number" min="0" step="1" placeholder="0"
                 value={value.upiAmt}
                 onChange={e => onChange({ ...value, upiAmt: e.target.value })}
-                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400"
-              />
+                className="w-full border border-stone-200 rounded-lg px-2 py-1.5 text-xs font-mono focus:outline-none focus:border-brand-400" />
             </div>
           </div>
           {splitSum > 0 && (
@@ -230,7 +205,6 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
         </div>
       )}
 
-      {/* ── Single method partial amount (khata mode, non-split) ── */}
       {khataMode && value.mode && value.mode !== 'SPLIT' && (
         <div className="bg-amber-light/40 rounded-xl p-3 border border-amber-200 space-y-1.5">
           <div className="flex items-center justify-between">
@@ -239,18 +213,15 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
             </label>
             <span className="text-[10px] text-stone-400">leave 0 → full bill on Khata</span>
           </div>
-          <input
-            type="number" min="0" step="1" placeholder="0"
+          <input type="number" min="0" step="1" placeholder="0"
             value={value.cashAmt}
             onChange={e => onChange({ ...value, cashAmt: e.target.value })}
-            className="w-full border border-amber-300 rounded-lg px-2.5 py-2 text-sm font-mono focus:outline-none focus:border-brand-500 bg-white"
-          />
+            className="w-full border border-amber-300 rounded-lg px-2.5 py-2 text-sm font-mono focus:outline-none focus:border-brand-500 bg-white" />
           {parseFloat(value.cashAmt) > 0 && (
             <p className="text-[10px] text-stone-500 font-semibold">
               ₹{parseFloat(value.cashAmt).toFixed(0)} now · ₹{Math.max(0, total - parseFloat(value.cashAmt)).toFixed(0)} → Khata
             </p>
           )}
-          {/* Razorpay hint for UPI in khata partial mode */}
           {(value.mode === 'UPI' || value.mode === 'CARD') && parseFloat(value.cashAmt) > 0 && (
             <div className="flex items-center gap-1.5 bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5">
               <span className="text-sm">📱</span>
@@ -265,7 +236,7 @@ function PaymentSelector({ total, value, onChange, khataMode }) {
   );
 }
 
-// ── Receipt Modal ─────────────────────────────────────────────────────────────
+// ── Receipt Modal ──────────────────────────────────────────────────────────────
 function ReceiptModal({ order, khataInfo, onClose }) {
   return (
     <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -298,9 +269,7 @@ function ReceiptModal({ order, khataInfo, onClose }) {
               <div className="space-y-1 text-xs">
                 <div className="flex justify-between text-stone-500">
                   <span>Previous due</span>
-                  <span className="font-mono font-bold text-amber-shop">
-                    ₹{Number(khataInfo.prevDue).toLocaleString('en-IN')}
-                  </span>
+                  <span className="font-mono font-bold text-amber-shop">₹{Number(khataInfo.prevDue).toLocaleString('en-IN')}</span>
                 </div>
                 <div className="flex justify-between text-stone-500">
                   <span>This bill</span>
@@ -324,9 +293,7 @@ function ReceiptModal({ order, khataInfo, onClose }) {
                 </div>
                 <div className="flex justify-between font-bold text-sm border-t border-amber-200 pt-1">
                   <span className="text-stone-700">New Total Due</span>
-                  <span className="font-mono text-amber-shop">
-                    ₹{Number(khataInfo.newDue).toLocaleString('en-IN')}
-                  </span>
+                  <span className="font-mono text-amber-shop">₹{Number(khataInfo.newDue).toLocaleString('en-IN')}</span>
                 </div>
               </div>
             </div>
@@ -376,9 +343,7 @@ function KhataCard({ account, billTotal, totalPaidNow }) {
         </div>
         <div className="text-right">
           <p className="text-[10px] text-stone-400">Credit Limit</p>
-          <p className="text-xs font-bold text-stone-600 font-mono">
-            ₹{creditLimit.toLocaleString('en-IN')}
-          </p>
+          <p className="text-xs font-bold text-stone-600 font-mono">₹{creditLimit.toLocaleString('en-IN')}</p>
         </div>
       </div>
       <div>
@@ -394,8 +359,7 @@ function KhataCard({ account, billTotal, totalPaidNow }) {
         </div>
         {overLimit && (
           <p className="text-[10px] text-red-500 font-semibold mt-1 flex items-center gap-1">
-            <AlertTriangle size={10} />
-            Over limit by ₹{(newDue - creditLimit).toLocaleString('en-IN')}
+            <AlertTriangle size={10} /> Over limit by ₹{(newDue - creditLimit).toLocaleString('en-IN')}
           </p>
         )}
       </div>
@@ -432,6 +396,173 @@ function KhataCard({ account, billTotal, totalPaidNow }) {
   );
 }
 
+// ── Bill Panel (Right Panel) — extracted for reuse ────────────────────────────
+function BillPanel({
+  validRows, rows, updateRow, removeRow, doReset,
+  grandTotal, useKhata, selectedAccount, totalPaidNow, addedToKhata,
+  needsRazorpay, cashDelta, accountDelta, payState, setPayState,
+  khataAccountId, setKhataAccountId, khataAccounts, setUseKhata,
+  billLabel, submitLabel, saleMutation, handleSubmit,
+  isMobile, onClose,
+}) {
+  const rowTotal = (row) => row.product ? row.product.pricePerKg * row.qty : 0;
+
+  return (
+    <div className="flex flex-col bg-white h-full overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 flex-shrink-0 bg-stone-50">
+        <div className="flex items-center gap-2">
+          {isMobile && (
+            <button onClick={onClose}
+              className="flex items-center justify-center w-8 h-8 rounded-lg border border-stone-200 text-stone-500 hover:bg-stone-100 transition">
+              <ArrowLeft size={16} />
+            </button>
+          )}
+          <div>
+            <p className="text-sm font-bold text-stone-800">Bill</p>
+            <p className="text-[10px] text-stone-400">{validRows.length} item{validRows.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <button onClick={doReset}
+          className="flex items-center gap-1 text-[10px] text-stone-400 hover:text-red-500 border border-stone-200 rounded-lg px-2 py-1 transition">
+          <RotateCcw size={10} /> Clear
+        </button>
+      </div>
+
+      {/* Items list */}
+      <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
+        {validRows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-stone-300 text-center py-8">
+            <ShoppingBag size={28} className="mb-2 opacity-40" />
+            <p className="text-xs">Bill is empty</p>
+            <p className="text-[10px] mt-0.5">Tap products to add</p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {validRows.map(row => {
+              const step   = row.product?.orderStep   || 0.5;
+              const minQty = row.product?.minOrderQty || 0.5;
+              return (
+                <div key={row.id}
+                  className="flex items-start justify-between gap-2 py-2 border-b border-stone-100 last:border-0">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-stone-800 truncate">
+                      {row.product?.categoryIcon} {row.product?.name}
+                    </p>
+                    <p className="text-[10px] text-stone-400 mb-1">₹{row.product?.pricePerKg}/kg</p>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => updateRow(row.id, {
+                          qty: Math.max(minQty, parseFloat((row.qty - step).toFixed(3)))
+                        })}
+                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center text-stone-400 hover:bg-red-50 hover:text-red-500 transition">
+                        <Minus size={10} />
+                      </button>
+                      <QtyInput
+                        value={row.qty} step={step} minQty={minQty}
+                        onCommit={val => updateRow(row.id, { qty: val })}
+                        className="w-16 py-0.5 text-[10px]"
+                      />
+                      <button
+                        onClick={() => updateRow(row.id, {
+                          qty: parseFloat((row.qty + step).toFixed(3))
+                        })}
+                        className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center text-stone-400 hover:bg-green-50 hover:text-green-600 transition">
+                        <Plus size={10} />
+                      </button>
+                      <span className="text-[10px] text-stone-400 font-mono ml-1">
+                        @₹{row.product?.pricePerKg}
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-stone-400 mt-0.5">Tap qty to type</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold text-stone-800 font-mono">₹{rowTotal(row).toFixed(0)}</p>
+                    <button onClick={() => removeRow(row.id)} className="text-stone-300 hover:text-red-400 mt-0.5">
+                      <X size={11} />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Bill footer */}
+      <div className="border-t border-stone-200 px-4 py-3 bg-stone-50 flex-shrink-0 space-y-1.5">
+        <div className="flex justify-between text-xs text-stone-500">
+          <span>Bill Total</span><span className="font-mono">₹{grandTotal.toFixed(0)}</span>
+        </div>
+        {!useKhata && payState.mode === 'SPLIT' && (cashDelta + accountDelta) > 0 && (
+          <>
+            {cashDelta > 0 && (
+              <div className="flex justify-between text-xs text-green-shop">
+                <span>💵 Cash</span><span className="font-mono">₹{cashDelta.toFixed(0)}</span>
+              </div>
+            )}
+            {accountDelta > 0 && (
+              <div className="flex justify-between text-xs text-blue-500">
+                <span>📱 UPI/Card (Razorpay)</span><span className="font-mono">₹{accountDelta.toFixed(0)}</span>
+              </div>
+            )}
+          </>
+        )}
+        {useKhata && selectedAccount && (
+          <>
+            {totalPaidNow > 0 && (
+              <div className="flex justify-between text-xs text-green-shop">
+                <span>Paying now{needsRazorpay ? ' (Razorpay)' : ''}</span>
+                <span className="font-mono">₹{totalPaidNow.toFixed(0)}</span>
+              </div>
+            )}
+            {addedToKhata > 0 && (
+              <div className="flex justify-between text-xs text-amber-shop">
+                <span>To Khata</span><span className="font-mono">₹{addedToKhata.toFixed(0)}</span>
+              </div>
+            )}
+            <div className="flex justify-between text-xs text-stone-400">
+              <span>Prev due</span>
+              <span className="font-mono">₹{Number(selectedAccount.currentDue || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div className="flex justify-between text-xs font-bold text-amber-shop border-t border-stone-200 pt-1">
+              <span>New Total Due</span>
+              <span className="font-mono">₹{(Number(selectedAccount.currentDue || 0) + addedToKhata).toLocaleString('en-IN')}</span>
+            </div>
+          </>
+        )}
+        <div className="flex justify-between items-center pt-1 border-t border-stone-200">
+          <span className="text-sm font-bold text-stone-800">Total</span>
+          <span className="text-xl font-bold text-brand-500 font-mono">₹{grandTotal.toFixed(0)}</span>
+        </div>
+        <div className="text-[10px] text-stone-400 flex justify-between">
+          <span>{rows[0]?.product ? (rows[0]?.product?.name || 'Walk-in') : 'Walk-in'}</span>
+          <span className={clsx('font-semibold text-right max-w-[150px] truncate', !payState.mode && 'text-red-400')}>
+            {billLabel}
+          </span>
+        </div>
+      </div>
+
+      <div className="p-3 flex-shrink-0">
+        <button
+          onClick={handleSubmit}
+          disabled={saleMutation.isLoading || grandTotal === 0}
+          className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 text-sm font-bold transition disabled:opacity-50 shadow-brand">
+          {saleMutation.isLoading
+            ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : <><ShoppingBag size={15} /> {submitLabel}</>
+          }
+        </button>
+        {needsRazorpay && !saleMutation.isLoading && (
+          <p className="text-center text-[10px] text-stone-400 mt-1.5 flex items-center justify-center gap-1">
+            <span>🔒</span> Secured by Razorpay
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Admin New Sale ─────────────────────────────────────────────────────────────
 export default function AdminNewSale() {
   const {
@@ -446,6 +577,9 @@ export default function AdminNewSale() {
   const [useKhata,       setUseKhata]       = useState(false);
   const [khataAccountId, setKhataAccountId] = useState('');
   const [payState,       setPayState]       = useState({ mode: '', cashAmt: '', upiAmt: '' });
+
+  // Mobile: show bill panel (right panel) overlay
+  const [showBillPanel,  setShowBillPanel]  = useState(false);
 
   const { pay } = useRazorpay();
 
@@ -468,37 +602,22 @@ export default function AdminNewSale() {
   const grandTotal = total();
   const { cashDelta, accountDelta } = computeSplit(payState, grandTotal);
 
-  // totalPaidNow for Khata scenarios
   const totalPaidNow = (() => {
     if (!useKhata) return grandTotal;
-    if (payState.mode === 'SPLIT') {
-      return Math.min(cashDelta + accountDelta, grandTotal);
-    }
+    if (payState.mode === 'SPLIT') return Math.min(cashDelta + accountDelta, grandTotal);
     return Math.min(parseFloat(payState.cashAmt) || 0, grandTotal);
   })();
 
   const addedToKhata    = useKhata ? Math.max(0, grandTotal - totalPaidNow) : 0;
   const effectiveMethod = useKhata ? 'KHATA' : payState.mode === 'SPLIT' ? 'SPLIT' : payState.mode;
 
-  // ── Determine whether Razorpay should fire and for how much ──────────────────
-  // Rules:
-  //   CASH only         → no Razorpay  (upiAmount = 0)
-  //   UPI / CARD        → Razorpay for full amount (or partial amount in khata mode)
-  //   SPLIT w/ upi > 0  → Razorpay only for the UPI portion
-
- const razorpayAmount = (() => {
-  if (payState.mode === 'UPI' || payState.mode === 'CARD') {
-    return useKhata
-      ? (parseFloat(payState.cashAmt) || 0)  // cashAmt = UPI amount paying now in khata-UPI mode
-      : grandTotal;
-  }
-  if (payState.mode === 'SPLIT') {
-    // In khata+split: upiAmt is the Razorpay portion, rest is khata
-    // In normal split: upiAmt is the Razorpay portion
-    return parseFloat(payState.upiAmt) || 0;
-  }
-  return 0;
-})();
+  const razorpayAmount = (() => {
+    if (payState.mode === 'UPI' || payState.mode === 'CARD') {
+      return useKhata ? (parseFloat(payState.cashAmt) || 0) : grandTotal;
+    }
+    if (payState.mode === 'SPLIT') return parseFloat(payState.upiAmt) || 0;
+    return 0;
+  })();
 
   const needsRazorpay = razorpayAmount > 0;
 
@@ -507,9 +626,9 @@ export default function AdminNewSale() {
     setUseKhata(false);
     setKhataAccountId('');
     setPayState({ mode: '', cashAmt: '', upiAmt: '' });
+    setShowBillPanel(false);
   };
 
-  // ── finalizeSale: called after Razorpay succeeds (or directly for cash) ──────
   const finalizeSale = async (razorpayResult = null) => {
     const salePayload = {
       ...toPayload(),
@@ -522,7 +641,6 @@ export default function AdminNewSale() {
         (payState.mode === 'UPI' || payState.mode === 'CARD') ? (useKhata ? totalPaidNow : grandTotal)
         : payState.mode === 'SPLIT' ? accountDelta
         : 0,
-      // attach Razorpay reference if available
       ...(razorpayResult && {
         razorpayPaymentId: razorpayResult.razorpay_payment_id,
         razorpayOrderId:   razorpayResult.razorpay_order_id,
@@ -557,7 +675,7 @@ export default function AdminNewSale() {
             upiPaid:      (payState.mode === 'UPI' || payState.mode === 'CARD') ? totalPaidNow
                         : payState.mode === 'SPLIT' ? accountDelta : 0,
             addedToKhata,
-            newDue:       Number(selectedAccount.currentDue || 0) + addedToKhata,
+            newDue: Number(selectedAccount.currentDue || 0) + addedToKhata,
           });
           qc.invalidateQueries('khata-summary');
           qc.invalidateQueries('khata');
@@ -573,9 +691,7 @@ export default function AdminNewSale() {
     }
   );
 
-  // ── handleSubmit: validates → Razorpay (if needed) → finalizeSale ────────────
   const handleSubmit = async () => {
-    // Validations
     if (!customerMobile || customerMobile.length < 10) { toast.error('Enter valid 10-digit mobile'); return; }
     if (rows.filter(r => r.product && r.qty > 0).length === 0) { toast.error('Add at least one product'); return; }
     if (useKhata && !khataAccountId) { toast.error('Select a Khata account'); return; }
@@ -585,15 +701,8 @@ export default function AdminNewSale() {
       if (!isValid) { toast.error(error); return; }
     }
 
-    // ── No Razorpay needed (pure cash) ─────────────────────────────────────────
-    if (!needsRazorpay) {
-      finalizeSale(null);
-      return;
-    }
+    if (!needsRazorpay) { finalizeSale(null); return; }
 
-    // ── Razorpay flow ──────────────────────────────────────────────────────────
-    // overrideAmount tells the backend to charge exactly the UPI portion,
-    // NOT the full grandTotal (important for SPLIT and partial Khata UPI).
     const cartItemsForRazorpay = rows
       .filter(r => r.product && r.qty > 0)
       .map(r => ({ product: r.product, qty: r.qty }));
@@ -606,41 +715,36 @@ export default function AdminNewSale() {
     };
 
     try {
+      const upiNow = (() => {
+        if (payState.mode === 'SPLIT') return accountDelta;
+        if (payState.mode === 'UPI' || payState.mode === 'CARD') {
+          return useKhata ? (parseFloat(payState.cashAmt) || 0) : grandTotal;
+        }
+        return 0;
+      })();
 
-                const upiNow = (() => {
-            if (payState.mode === 'SPLIT')               return accountDelta;                   // upiAmt field
-            if (payState.mode === 'UPI' || payState.mode === 'CARD') {
-              return useKhata
-                ? (parseFloat(payState.cashAmt) || 0)    // cashAmt = "paying now" in khata-UPI
-                : grandTotal;
-            }
-            return 0;
-          })();
+      const cashNow = (() => {
+        if (payState.mode === 'SPLIT') return cashDelta;
+        return 0;
+      })();
 
-
-          const cashNow = (() => {
-            if (payState.mode === 'SPLIT') return cashDelta;                                    // cashAmt field
-            return 0;
-          })();
-
-
-            await pay({
+      await pay({
         cartItems:      cartItemsForRazorpay,
         customerDetails,
-        overrideAmount: razorpayAmount,   // exact amount Razorpay charges
+        overrideAmount: razorpayAmount,
         cashPaid:       cashNow,
-        upiPaid:        upiNow,           // exact UPI portion backend stores
+        upiPaid:        upiNow,
         paymentMode:    payState.mode,
         role:           'ADMIN',
         isKhata:        useKhata,
         onSuccess: (razorpayResult) => { finalizeSale(razorpayResult); },
         onFailure: (err) => { toast.error('Payment cancelled or failed.'); },
       });
-          } catch (err) {
-            toast.error('Could not open payment gateway. Please try again.');
-            console.error('Razorpay error:', err);
-          }
-        };
+    } catch (err) {
+      toast.error('Could not open payment gateway. Please try again.');
+      console.error('Razorpay error:', err);
+    }
+  };
 
   const quickAdd = (product) => {
     const existing = rows.find(r => r.productId === product.id);
@@ -685,344 +789,320 @@ export default function AdminNewSale() {
     return payState.mode === 'CASH' ? '💵 Cash' : payState.mode === 'UPI' ? '📱 UPI' : '💳 Card';
   })();
 
-  // Label for the submit button
   const submitLabel = (() => {
     if (saleMutation.isLoading) return null;
     if (needsRazorpay) {
-      if (payState.mode === 'SPLIT') {
-        return `💵₹${cashDelta.toFixed(0)} Cash + 📱 Pay ₹${razorpayAmount.toFixed(0)} via UPI`;
-      }
+      if (payState.mode === 'SPLIT') return `💵₹${cashDelta.toFixed(0)} Cash + 📱 Pay ₹${razorpayAmount.toFixed(0)} via UPI`;
       return `📱 Pay ₹${razorpayAmount.toFixed(0)} via Razorpay`;
     }
     return `💵 Complete Sale — ₹${grandTotal.toFixed(0)} Cash`;
   })();
 
+  // Shared bill panel props
+  const billPanelProps = {
+    validRows, rows, updateRow, removeRow, doReset,
+    grandTotal, useKhata, selectedAccount, totalPaidNow, addedToKhata,
+    needsRazorpay, cashDelta, accountDelta, payState, setPayState,
+    khataAccountId, setKhataAccountId, khataAccounts, setUseKhata,
+    billLabel, submitLabel, saleMutation, handleSubmit,
+  };
+
+  // Cart count & total for floating button
+  const cartCount = validRows.length;
+  const cartTotal = grandTotal;
+
   return (
-    <div className="flex gap-3 h-full" style={{ minHeight: 0 }}>
+    <>
+      {/* ── DESKTOP LAYOUT: side-by-side (md and above) ── */}
+      <div className="hidden md:flex gap-3 h-full" style={{ minHeight: 0 }}>
 
-      {/* ── LEFT PANEL ── */}
-      <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-y-auto pr-1" style={{ minHeight: 0 }}>
-
-        {/* Customer */}
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3 flex-shrink-0">
-          <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Customer</p>
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-[10px] text-stone-400 mb-1 block">Name (optional)</label>
-              <input value={customerName} onChange={e => setField('customerName', e.target.value)}
-                placeholder="Customer name"
-                className="w-full border border-stone-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-400" />
-            </div>
-            <div>
-              <label className="text-[10px] text-stone-400 mb-1 block">Mobile *</label>
-              <input value={customerMobile}
-                onChange={e => setField('customerMobile', e.target.value.replace(/\D/g,'').slice(0,10))}
-                placeholder="10-digit mobile" type="tel" maxLength={10}
-                className="w-full border border-stone-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-400" />
-            </div>
-          </div>
-        </div>
-
-        {/* Products */}
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3 flex-shrink-0">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Products</p>
-            <button onClick={addRow}
-              className="flex items-center gap-1 text-[10px] font-semibold text-brand-500 hover:text-brand-700">
-              <Plus size={11} /> Add row
-            </button>
-          </div>
-          <div className="flex items-center gap-1.5 border border-stone-200 rounded-lg px-2 py-1.5 mb-2">
-            <Search size={11} className="text-stone-400 flex-shrink-0" />
-            <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
-              placeholder="Search products…"
-              className="text-xs outline-none w-full placeholder:text-stone-300" />
-          </div>
-          <div className="flex gap-1.5 mb-3 flex-wrap">
-            {[{ id: 'all', name: 'All', icon: '🥩' }, ...categories].map(c => (
-              <button key={c.id} onClick={() => setCatFilter(String(c.id))}
-                className={clsx('px-2.5 py-1 rounded-full text-[10px] font-semibold transition',
-                  catFilter === String(c.id) ? 'bg-brand-500 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200')}>
-                {c.icon} {c.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Quick add grid */}
-          <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 mb-3">
-            {filteredProducts.map(p => {
-              const inCart = rows.some(r => r.productId === p.id);
-              const isOut  = p.stockStatus === 'OUT_OF_STOCK';
-              return (
-                <button key={p.id} onClick={() => !isOut && quickAdd(p)} disabled={isOut}
-                  className={clsx('rounded-xl border p-2 text-left transition',
-                    isOut ? 'border-stone-100 bg-stone-50 opacity-40 cursor-not-allowed'
-                    : inCart ? 'border-brand-400 bg-brand-50'
-                    : 'border-stone-200 hover:border-brand-300 hover:bg-stone-50')}>
-                  <div className="text-base mb-0.5">{p.categoryIcon || '🥩'}</div>
-                  <div className="text-[10px] font-semibold text-stone-700 truncate">{p.name}</div>
-                  <div className="text-[10px] text-brand-500 font-bold">₹{p.pricePerKg}/kg</div>
-                  {inCart && <div className="text-[9px] text-brand-400 font-bold">✓ Added</div>}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Row table */}
-          <div className="border-t border-stone-100 pt-3">
-            <div className="grid grid-cols-[2fr_90px_70px_64px_20px] gap-1.5 mb-1.5 px-0.5">
-              {['Product', 'Qty (kg)', 'Rate', 'Amount', ''].map((h, i) => (
-                <div key={i} className="text-[9px] font-bold text-stone-400 uppercase">{h}</div>
-              ))}
-            </div>
-            {rows.map(row => (
-              <div key={row.id}
-                className="grid grid-cols-[2fr_90px_70px_64px_20px] gap-1.5 mb-1.5 items-center">
-                <select value={row.productId || ''} onChange={e => handleProductChange(row.id, e.target.value)}
-                  className="border border-stone-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white">
-                  <option value="">Select…</option>
-                  {products.map(p => (
-                    <option key={p.id} value={p.id} disabled={p.stockStatus === 'OUT_OF_STOCK'}>{p.name}</option>
-                  ))}
-                </select>
-                <QtyInput
-                  value={row.qty}
-                  step={row.product?.orderStep || 0.5}
-                  minQty={row.product?.minOrderQty || 0.5}
-                  onCommit={val => updateRow(row.id, { qty: val })}
-                  className="w-full py-1.5 text-xs"
-                />
-                <div className="text-[10px] text-stone-400 text-right font-mono">
-                  {row.product ? `₹${row.product.pricePerKg}` : '—'}
-                </div>
-                <div className="text-xs font-bold text-stone-800 text-right font-mono">
-                  {row.product ? `₹${rowTotal(row).toFixed(0)}` : '—'}
-                </div>
-                <button onClick={() => removeRow(row.id)} className="text-stone-300 hover:text-red-500">
-                  <X size={12} />
-                </button>
-              </div>
-            ))}
-            <button onClick={addRow}
-              className="w-full mt-1 border border-dashed border-stone-200 rounded-lg py-1.5 text-[10px] text-stone-400 hover:border-brand-300 hover:text-brand-400 transition flex items-center justify-center gap-1">
-              <Plus size={10} /> Add another item
-            </button>
-          </div>
-        </div>
-
-        {/* Payment */}
-        <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3 flex-shrink-0 space-y-3">
-          <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Payment</p>
-
-          {/* Khata toggle */}
-          <label className="flex items-center gap-2 cursor-pointer select-none p-2 rounded-xl border border-stone-200 hover:bg-stone-50 transition">
-            <input type="checkbox" checked={useKhata}
-              onChange={e => {
-                setUseKhata(e.target.checked);
-                if (!e.target.checked) { setKhataAccountId(''); setPayState({ mode: '', cashAmt: '', upiAmt: '' }); }
-              }}
-              className="w-4 h-4 rounded accent-brand-500" />
-            <BookOpen size={14} className="text-amber-shop" />
-            <span className="text-xs font-semibold text-stone-700">Add to Khata (Credit Account)</span>
-          </label>
-
-          {/* Khata account */}
-          {useKhata && (
-            <div>
-              <label className="text-[10px] text-stone-400 mb-1 block">Khata Account *</label>
-              <div className="relative">
-                <select value={khataAccountId} onChange={e => setKhataAccountId(e.target.value)}
-                  className="w-full border border-amber-300 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none bg-white appearance-none pr-8">
-                  <option value="">— Choose account —</option>
-                  {khataAccounts.map(a => (
-                    <option key={a.id} value={a.id}>
-                      {a.customerName} ({a.customerMobile}) · Due ₹{Number(a.currentDue).toLocaleString('en-IN')}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
-              </div>
-              {khataAccounts.length === 0 && (
-                <p className="text-[10px] text-amber-shop mt-1 flex items-center gap-1">
-                  <AlertTriangle size={10} /> No Khata accounts. Create one first.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="border-t border-stone-100" />
-
-          <PaymentSelector
-            total={grandTotal}
-            value={payState}
-            onChange={setPayState}
-            khataMode={useKhata}
+        {/* LEFT PANEL */}
+        <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-y-auto pr-1" style={{ minHeight: 0 }}>
+          <LeftPanelContent
+            customerName={customerName} customerMobile={customerMobile}
+            setField={setField} rows={rows} products={products}
+            categories={categories} productSearch={productSearch}
+            setProductSearch={setProductSearch} catFilter={catFilter}
+            setCatFilter={setCatFilter} addRow={addRow} removeRow={removeRow}
+            updateRow={updateRow} handleProductChange={handleProductChange}
+            quickAdd={quickAdd} filteredProducts={filteredProducts}
+            rowTotal={rowTotal}
+            useKhata={useKhata} setUseKhata={setUseKhata}
+            khataAccountId={khataAccountId} setKhataAccountId={setKhataAccountId}
+            khataAccounts={khataAccounts} selectedAccount={selectedAccount}
+            grandTotal={grandTotal} totalPaidNow={totalPaidNow}
+            payState={payState} setPayState={setPayState}
           />
-
-          {useKhata && selectedAccount && (
-            <KhataCard
-              account={selectedAccount}
-              billTotal={grandTotal}
-              totalPaidNow={totalPaidNow}
-            />
-          )}
         </div>
 
-      </div>{/* end left */}
-
-      {/* ── RIGHT PANEL — Bill ── */}
-      <div className="flex flex-col bg-white rounded-2xl border border-stone-200 shadow-card overflow-hidden flex-shrink-0"
-        style={{ width: '300px', minHeight: 0 }}>
-
-        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-100 flex-shrink-0 bg-stone-50">
-          <div>
-            <p className="text-sm font-bold text-stone-800">Bill</p>
-            <p className="text-[10px] text-stone-400">{validRows.length} item{validRows.length !== 1 ? 's' : ''}</p>
-          </div>
-          <button onClick={doReset}
-            className="flex items-center gap-1 text-[10px] text-stone-400 hover:text-red-500 border border-stone-200 rounded-lg px-2 py-1 transition">
-            <RotateCcw size={10} /> Clear
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-y-auto px-3 py-2" style={{ minHeight: 0 }}>
-          {validRows.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-stone-300 text-center py-8">
-              <ShoppingBag size={28} className="mb-2 opacity-40" />
-              <p className="text-xs">Bill is empty</p>
-              <p className="text-[10px] mt-0.5">Tap products to add</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {validRows.map(row => {
-                const step   = row.product?.orderStep   || 0.5;
-                const minQty = row.product?.minOrderQty || 0.5;
-                return (
-                  <div key={row.id}
-                    className="flex items-start justify-between gap-2 py-2 border-b border-stone-100 last:border-0">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-stone-800 truncate">
-                        {row.product?.categoryIcon} {row.product?.name}
-                      </p>
-                      <p className="text-[10px] text-stone-400 mb-1">₹{row.product?.pricePerKg}/kg</p>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => updateRow(row.id, {
-                            qty: Math.max(minQty, parseFloat((row.qty - step).toFixed(3)))
-                          })}
-                          className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center text-stone-400 hover:bg-red-50 hover:text-red-500 transition">
-                          <Minus size={10} />
-                        </button>
-                        <QtyInput
-                          value={row.qty}
-                          step={step}
-                          minQty={minQty}
-                          onCommit={val => updateRow(row.id, { qty: val })}
-                          className="w-16 py-0.5 text-[10px]"
-                        />
-                        <button
-                          onClick={() => updateRow(row.id, {
-                            qty: parseFloat((row.qty + step).toFixed(3))
-                          })}
-                          className="w-6 h-6 border border-stone-200 rounded flex items-center justify-center text-stone-400 hover:bg-green-50 hover:text-green-600 transition">
-                          <Plus size={10} />
-                        </button>
-                        <span className="text-[10px] text-stone-400 font-mono ml-1">
-                          @₹{row.product?.pricePerKg}
-                        </span>
-                      </div>
-                      <p className="text-[9px] text-stone-400 mt-0.5">Tap qty to type</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-bold text-stone-800 font-mono">₹{rowTotal(row).toFixed(0)}</p>
-                      <button onClick={() => removeRow(row.id)} className="text-stone-300 hover:text-red-400 mt-0.5">
-                        <X size={11} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Bill footer */}
-        <div className="border-t border-stone-200 px-4 py-3 bg-stone-50 flex-shrink-0 space-y-1.5">
-          <div className="flex justify-between text-xs text-stone-500">
-            <span>Bill Total</span><span className="font-mono">₹{grandTotal.toFixed(0)}</span>
-          </div>
-          {!useKhata && payState.mode === 'SPLIT' && (cashDelta + accountDelta) > 0 && (
-            <>
-              {cashDelta > 0 && (
-                <div className="flex justify-between text-xs text-green-shop">
-                  <span>💵 Cash</span><span className="font-mono">₹{cashDelta.toFixed(0)}</span>
-                </div>
-              )}
-              {accountDelta > 0 && (
-                <div className="flex justify-between text-xs text-blue-500">
-                  <span>📱 UPI/Card (Razorpay)</span><span className="font-mono">₹{accountDelta.toFixed(0)}</span>
-                </div>
-              )}
-            </>
-          )}
-          {useKhata && selectedAccount && (
-            <>
-              {totalPaidNow > 0 && (
-                <div className="flex justify-between text-xs text-green-shop">
-                  <span>Paying now{needsRazorpay ? ' (Razorpay)' : ''}</span>
-                  <span className="font-mono">₹{totalPaidNow.toFixed(0)}</span>
-                </div>
-              )}
-              {addedToKhata > 0 && (
-                <div className="flex justify-between text-xs text-amber-shop">
-                  <span>To Khata</span><span className="font-mono">₹{addedToKhata.toFixed(0)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-xs text-stone-400">
-                <span>Prev due</span>
-                <span className="font-mono">₹{Number(selectedAccount.currentDue || 0).toLocaleString('en-IN')}</span>
-              </div>
-              <div className="flex justify-between text-xs font-bold text-amber-shop border-t border-stone-200 pt-1">
-                <span>New Total Due</span>
-                <span className="font-mono">₹{(Number(selectedAccount.currentDue || 0) + addedToKhata).toLocaleString('en-IN')}</span>
-              </div>
-            </>
-          )}
-          <div className="flex justify-between items-center pt-1 border-t border-stone-200">
-            <span className="text-sm font-bold text-stone-800">Total</span>
-            <span className="text-xl font-bold text-brand-500 font-mono">₹{grandTotal.toFixed(0)}</span>
-          </div>
-          <div className="text-[10px] text-stone-400 flex justify-between">
-            <span>{customerName || 'Walk-in'}</span>
-            <span className={clsx('font-semibold text-right max-w-[150px] truncate', !payState.mode && 'text-red-400')}>
-              {billLabel}
-            </span>
-          </div>
-        </div>
-
-        <div className="p-3 flex-shrink-0">
-          <button
-            onClick={handleSubmit}
-            disabled={saleMutation.isLoading || grandTotal === 0}
-            className="w-full flex items-center justify-center gap-2 bg-brand-500 hover:bg-brand-600 text-white rounded-xl py-3 text-sm font-bold transition disabled:opacity-50 shadow-brand">
-            {saleMutation.isLoading
-              ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              : <><ShoppingBag size={15} /> {submitLabel}</>
-            }
-          </button>
-          {/* Razorpay hint below button */}
-          {needsRazorpay && !saleMutation.isLoading && (
-            <p className="text-center text-[10px] text-stone-400 mt-1.5 flex items-center justify-center gap-1">
-              <span>🔒</span> Secured by Razorpay
-            </p>
-          )}
+        {/* RIGHT PANEL — Bill */}
+        <div className="flex flex-col bg-white rounded-2xl border border-stone-200 shadow-card overflow-hidden flex-shrink-0"
+          style={{ width: '300px', minHeight: 0 }}>
+          <BillPanel {...billPanelProps} isMobile={false} onClose={() => {}} />
         </div>
       </div>
+
+      {/* ── MOBILE LAYOUT: single column + slide-in bill panel ── */}
+      <div className="flex md:hidden flex-col h-full" style={{ minHeight: 0 }}>
+
+        {/* Mobile: scrollable left panel */}
+        <div className="flex-1 overflow-y-auto pb-24">
+          <div className="flex flex-col gap-3 p-3">
+            <LeftPanelContent
+              customerName={customerName} customerMobile={customerMobile}
+              setField={setField} rows={rows} products={products}
+              categories={categories} productSearch={productSearch}
+              setProductSearch={setProductSearch} catFilter={catFilter}
+              setCatFilter={setCatFilter} addRow={addRow} removeRow={removeRow}
+              updateRow={updateRow} handleProductChange={handleProductChange}
+              quickAdd={quickAdd} filteredProducts={filteredProducts}
+              rowTotal={rowTotal}
+              useKhata={useKhata} setUseKhata={setUseKhata}
+              khataAccountId={khataAccountId} setKhataAccountId={setKhataAccountId}
+              khataAccounts={khataAccounts} selectedAccount={selectedAccount}
+              grandTotal={grandTotal} totalPaidNow={totalPaidNow}
+              payState={payState} setPayState={setPayState}
+            />
+          </div>
+        </div>
+
+        {/* Floating Cart Button — only when items in cart */}
+        {cartCount > 0 && !showBillPanel && (
+          <div className="fixed bottom-4 left-0 right-0 flex justify-center z-40 px-4">
+            <button
+              onClick={() => setShowBillPanel(true)}
+              className="flex items-center justify-between w-full max-w-sm bg-brand-500 hover:bg-brand-600 text-white rounded-2xl py-3.5 px-5 shadow-2xl transition active:scale-95">
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <ShoppingCart size={20} />
+                  <span className="absolute -top-2 -right-2 bg-white text-brand-500 text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                    {cartCount}
+                  </span>
+                </div>
+                <span className="text-sm font-semibold">{cartCount} item{cartCount !== 1 ? 's' : ''}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-lg font-bold font-mono">₹{cartTotal.toFixed(0)}</span>
+                <span className="text-xs bg-white/20 rounded-lg px-2 py-0.5 font-semibold">View Bill →</span>
+              </div>
+            </button>
+          </div>
+        )}
+
+        {/* Mobile Bill Panel — slide up from bottom / full screen overlay */}
+        {showBillPanel && (
+          <>
+            {/* Backdrop */}
+            <div
+              className="fixed inset-0 bg-black/40 z-40"
+              onClick={() => setShowBillPanel(false)}
+            />
+            {/* Panel */}
+            <div className="fixed inset-x-0 bottom-0 top-12 z-50 bg-white rounded-t-2xl flex flex-col overflow-hidden shadow-2xl"
+              style={{ animation: 'slideUp 0.25s ease-out' }}>
+              <BillPanel
+                {...billPanelProps}
+                isMobile={true}
+                onClose={() => setShowBillPanel(false)}
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* Slide-up animation */}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(100%); opacity: 0; }
+          to   { transform: translateY(0);    opacity: 1; }
+        }
+      `}</style>
 
       {receipt && (
         <ReceiptModal order={receipt} khataInfo={receiptKhata}
           onClose={() => { setReceipt(null); setReceiptKhata(null); }} />
       )}
-    </div>
+    </>
+  );
+}
+
+// ── LeftPanelContent — shared between mobile and desktop ──────────────────────
+function LeftPanelContent({
+  customerName, customerMobile, setField,
+  rows, products, categories,
+  productSearch, setProductSearch,
+  catFilter, setCatFilter,
+  addRow, removeRow, updateRow,
+  handleProductChange, quickAdd, filteredProducts, rowTotal,
+  useKhata, setUseKhata, khataAccountId, setKhataAccountId,
+  khataAccounts, selectedAccount, grandTotal, totalPaidNow,
+  payState, setPayState,
+}) {
+  return (
+    <>
+      {/* Customer */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3">
+        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider mb-2">Customer</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="text-[10px] text-stone-400 mb-1 block">Name (optional)</label>
+            <input value={customerName} onChange={e => setField('customerName', e.target.value)}
+              placeholder="Customer name"
+              className="w-full border border-stone-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-400" />
+          </div>
+          <div>
+            <label className="text-[10px] text-stone-400 mb-1 block">Mobile *</label>
+            <input value={customerMobile}
+              onChange={e => setField('customerMobile', e.target.value.replace(/\D/g,'').slice(0,10))}
+              placeholder="10-digit mobile" type="tel" maxLength={10}
+              className="w-full border border-stone-200 rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-400" />
+          </div>
+        </div>
+      </div>
+
+      {/* Products */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Products</p>
+          <button onClick={addRow}
+            className="flex items-center gap-1 text-[10px] font-semibold text-brand-500 hover:text-brand-700">
+            <Plus size={11} /> Add row
+          </button>
+        </div>
+        <div className="flex items-center gap-1.5 border border-stone-200 rounded-lg px-2 py-1.5 mb-2">
+          <Search size={11} className="text-stone-400 flex-shrink-0" />
+          <input value={productSearch} onChange={e => setProductSearch(e.target.value)}
+            placeholder="Search products…"
+            className="text-xs outline-none w-full placeholder:text-stone-300" />
+        </div>
+        <div className="flex gap-1.5 mb-3 flex-wrap">
+          {[{ id: 'all', name: 'All', icon: '🥩' }, ...categories].map(c => (
+            <button key={c.id} onClick={() => setCatFilter(String(c.id))}
+              className={clsx('px-2.5 py-1 rounded-full text-[10px] font-semibold transition',
+                catFilter === String(c.id) ? 'bg-brand-500 text-white' : 'bg-stone-100 text-stone-500 hover:bg-stone-200')}>
+              {c.icon} {c.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Quick add grid */}
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5 mb-3">
+          {filteredProducts.map(p => {
+            const inCart = rows.some(r => r.productId === p.id);
+            const isOut  = p.stockStatus === 'OUT_OF_STOCK';
+            return (
+              <button key={p.id} onClick={() => !isOut && quickAdd(p)} disabled={isOut}
+                className={clsx('rounded-xl border p-2 text-left transition',
+                  isOut ? 'border-stone-100 bg-stone-50 opacity-40 cursor-not-allowed'
+                  : inCart ? 'border-brand-400 bg-brand-50'
+                  : 'border-stone-200 hover:border-brand-300 hover:bg-stone-50')}>
+                <div className="text-base mb-0.5">{p.categoryIcon || '🥩'}</div>
+                <div className="text-[10px] font-semibold text-stone-700 truncate">{p.name}</div>
+                <div className="text-[10px] text-brand-500 font-bold">₹{p.pricePerKg}/kg</div>
+                {inCart && <div className="text-[9px] text-brand-400 font-bold">✓ Added</div>}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Row table */}
+        <div className="border-t border-stone-100 pt-3">
+          <div className="grid grid-cols-[2fr_90px_70px_64px_20px] gap-1.5 mb-1.5 px-0.5">
+            {['Product', 'Qty (kg)', 'Rate', 'Amount', ''].map((h, i) => (
+              <div key={i} className="text-[9px] font-bold text-stone-400 uppercase">{h}</div>
+            ))}
+          </div>
+          {rows.map(row => (
+            <div key={row.id}
+              className="grid grid-cols-[2fr_90px_70px_64px_20px] gap-1.5 mb-1.5 items-center">
+              <select value={row.productId || ''} onChange={e => handleProductChange(row.id, e.target.value)}
+                className="border border-stone-200 rounded-lg px-2 py-1.5 text-xs focus:outline-none focus:border-brand-400 bg-white">
+                <option value="">Select…</option>
+                {products.map(p => (
+                  <option key={p.id} value={p.id} disabled={p.stockStatus === 'OUT_OF_STOCK'}>{p.name}</option>
+                ))}
+              </select>
+              <QtyInput
+                value={row.qty}
+                step={row.product?.orderStep || 0.5}
+                minQty={row.product?.minOrderQty || 0.5}
+                onCommit={val => updateRow(row.id, { qty: val })}
+                className="w-full py-1.5 text-xs"
+              />
+              <div className="text-[10px] text-stone-400 text-right font-mono">
+                {row.product ? `₹${row.product.pricePerKg}` : '—'}
+              </div>
+              <div className="text-xs font-bold text-stone-800 text-right font-mono">
+                {row.product ? `₹${rowTotal(row).toFixed(0)}` : '—'}
+              </div>
+              <button onClick={() => removeRow(row.id)} className="text-stone-300 hover:text-red-500">
+                <X size={12} />
+              </button>
+            </div>
+          ))}
+          <button onClick={addRow}
+            className="w-full mt-1 border border-dashed border-stone-200 rounded-lg py-1.5 text-[10px] text-stone-400 hover:border-brand-300 hover:text-brand-400 transition flex items-center justify-center gap-1">
+            <Plus size={10} /> Add another item
+          </button>
+        </div>
+      </div>
+
+      {/* Payment */}
+      <div className="bg-white rounded-2xl border border-stone-200 shadow-card p-3 space-y-3">
+        <p className="text-[10px] font-bold text-stone-400 uppercase tracking-wider">Payment</p>
+
+        {/* Khata toggle */}
+        <label className="flex items-center gap-2 cursor-pointer select-none p-2 rounded-xl border border-stone-200 hover:bg-stone-50 transition">
+          <input type="checkbox" checked={useKhata}
+            onChange={e => {
+              setUseKhata(e.target.checked);
+              if (!e.target.checked) { setKhataAccountId(''); setPayState({ mode: '', cashAmt: '', upiAmt: '' }); }
+            }}
+            className="w-4 h-4 rounded accent-brand-500" />
+          <BookOpen size={14} className="text-amber-shop" />
+          <span className="text-xs font-semibold text-stone-700">Add to Khata (Credit Account)</span>
+        </label>
+
+        {useKhata && (
+          <div>
+            <label className="text-[10px] text-stone-400 mb-1 block">Khata Account *</label>
+            <div className="relative">
+              <select value={khataAccountId} onChange={e => setKhataAccountId(e.target.value)}
+                className="w-full border border-amber-300 rounded-xl px-3 py-2.5 text-xs font-semibold focus:outline-none bg-white appearance-none pr-8">
+                <option value="">— Choose account —</option>
+                {khataAccounts.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.customerName} ({a.customerMobile}) · Due ₹{Number(a.currentDue).toLocaleString('en-IN')}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={12} className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
+            </div>
+            {khataAccounts.length === 0 && (
+              <p className="text-[10px] text-amber-shop mt-1 flex items-center gap-1">
+                <AlertTriangle size={10} /> No Khata accounts. Create one first.
+              </p>
+            )}
+          </div>
+        )}
+
+        <div className="border-t border-stone-100" />
+
+        <PaymentSelector
+          total={grandTotal}
+          value={payState}
+          onChange={setPayState}
+          khataMode={useKhata}
+        />
+
+        {useKhata && selectedAccount && (
+          <KhataCard
+            account={selectedAccount}
+            billTotal={grandTotal}
+            totalPaidNow={totalPaidNow}
+          />
+        )}
+      </div>
+    </>
   );
 }

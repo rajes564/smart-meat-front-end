@@ -49,7 +49,7 @@ function PageLoader() {
             <span key={i} className="text-5xl animate-bounce" style={{ animationDelay: `${i * 0.2}s` }}>{e}</span>
           ))}
         </div>
-        <p className="font-display text-2xl font-bold text-stone-800">Smart Meat Shop</p>
+        <p className="font-display text-2xl font-bold text-stone-800">RS ROYAL MEAT MART</p>
         <p className="text-sm text-stone-500 mt-1">Loading…</p>
       </div>
     </div>
