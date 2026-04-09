@@ -3,8 +3,8 @@ import { Share2 } from "lucide-react";
 const ShareSection = () => {
   const handleShare = async () => {
     const shareData = {
-      title: "My Website",
-      text: "Check this out!",
+      title: "RS ROYAL MEAT MART",
+      text: "Order fresh fish, chicken and mutton online. RS Royal Meat Mart, Uppal Hyderabad. Daily fresh stock...",
       url: window.location.href,
     };
 
