@@ -2,8 +2,8 @@ import axios from 'axios';
 
 import { useAuthStore } from '../store';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-// const BASE_URL = import.meta.env.VITE_API_URL || 'https://smart-meat-back-end.onrender.com';
+//const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+ const BASE_URL = import.meta.env.VITE_API_URL || 'https://smart-meat-back-end.onrender.com';
 
 const api = axios.create({
   baseURL: BASE_URL + '/api',
